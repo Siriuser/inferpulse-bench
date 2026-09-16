@@ -27,7 +27,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from urllib.parse import urlsplit
 
-VERSION = "1.7.0"
+VERSION = "1.7.1"
+SUPPORT_URL = "https://gitee.com/xum1983/inferpulse-bench/blob/master/SPONSOR.md"
 CONFIG_VERSION = "inferpulse.standalone.config/v1"
 EVIDENCE_VERSION = "inferpulse.standalone.evidence/v1"
 MODES = ("off", "on")
@@ -1601,6 +1602,14 @@ def render_report(summary):
     lines += ["- " + md(warning) for warning in summary["warnings"]]
     if summary["config"]["self_review"]:
         lines += render_self_review(summary.get("self_review", {"status": "not_run"}))
+    lines += [
+        "",
+        "---",
+        "",
+        f"如果你觉得 InferPulse Bench 帮到了你，欢迎[打开支持页面]({SUPPORT_URL})，"
+        "请作者喝一杯瑞幸咖啡。支持全凭自愿，不影响任何功能的使用。"
+        "你的使用、分享和反馈，同样值得感谢。",
+    ]
     return "\n".join(lines) + "\n"
 
 
