@@ -1,8 +1,12 @@
 # InferPulse Bench
 
+[简体中文](README.md) · [English](README.en.md)
+
 面向内网部署与交付场景的轻量大模型性能测试工具。填写模型连接信息，自动完成思考模式核验、分档测试，并生成可复核的中文报告。
 
 **当前版本：1.7.0 · Python 3.9+ · 零第三方依赖 · MIT**
+
+[下载运行包](https://gitee.com/xum1983/inferpulse-bench/releases/tag/v1.7.0) · [报告示例（模拟服务）](report.example.md) · [详细使用说明](使用说明.md) · [反馈与贡献](CONTRIBUTING.md)
 
 ## 产品与仓库定位
 
@@ -11,7 +15,7 @@ InferPulse 是 AI 模型服务性能与容量测试产品的统一名称。本�
 | 名称 | 仓库命名 | 定位与发布状态 |
 |---|---|---|
 | **InferPulse Bench** | `inferpulse-bench` | 本仓库；独立 Python 脚本，通过配置文件运行，生成中文报告 |
-| **InferPulse** | `inferpulse` | 带图形界面的完整产品；后续单独公开发布，本仓库不包含其安装包 |
+| **InferPulse** | [`inferpulse`](https://gitee.com/xum1983/inferpulse) | 带图形界面的完整产品；已建立占位仓库，代码与安装包尚未公开发布 |
 
 两者分别管理版本、下载包和发布记录。Bench 当前版本为 1.7.0，不代表图形界面产品的版本或发布状态；配置和证据格式目前不能直接互换。MIT 许可适用于本仓库内容，完整产品的许可将在其发布时单独说明。
 
@@ -34,6 +38,31 @@ python3 llm_benchmark.py
 Windows 可将 `python3` 改为 `python`。如果没有配置文件，首次运行会自动创建模板并退出，填写后再次运行即可。
 
 报告生成在脚本旁：`llm_benchmark_report_日期-时间-随机标识.md`。详细操作见 [使用说明](使用说明.md)。
+
+### 先做一次小规模试跑
+
+下面是可独立保存的完整配置。将其保存为脚本旁的 `llm_benchmark.jsonc`，填写连接信息后运行。它只测关闭思考、1024 字符和单并发：1 次预检 + 1 次性能请求，关闭预热与自评。用于检查连接与报告流程，不能用于容量结论。
+
+```jsonc
+{
+  "schema_version": "inferpulse.standalone.config/v1",
+  "model": {
+    "name": "Qwen3-8B", // 替换为服务接受的完整模型名称
+    "api_url": "http://127.0.0.1:8000/v1/chat/completions",
+    "api_key": ""
+  },
+  "thinking_modes": ["off"],
+  "input_characters": [1024],
+  "concurrency": [1],
+  "output_tokens": {"off": 128, "on": 4096},
+  "repetitions": 1,
+  "warmup": {"enabled": false, "requests_per_length": 1},
+  "timeouts": {"connect_seconds": 10, "read_seconds": 120, "total_seconds": 600},
+  "self_review": false
+}
+```
+
+服务需要鉴权时填写 Key，不需要时可留空。`127.0.0.1:8000` 是占位地址。`--dry-run` 只校验配置和显示计划，不验证连通性，也不会发请求。试跑完成后可从模型示例恢复完整矩阵，或逐步增加档位。
 
 ## 主要功能
 
@@ -62,6 +91,21 @@ Windows 可将 `python3` 改为 `python`。如果没有配置文件，首次运�
 
 配置中的 131072、262144、524288、1048576 字符档默认注释，取消注释即可启用。字符数不等于 Token 数，实际可接受长度由服务决定。
 
+### 配置与兼容范围
+
+JSONC 支持 `//`、`/* … */` 注释和末尾逗号。数组至少保留一项；并发可设为 `[1, 2, 4, 6, 10]` 等 1～10 内不重复的整数。字符档允许 128～1048576，输出预算允许 1～65536 Token，轮数允许 1～1000；超时单位为秒。修改后先用 `--dry-run` 核对计划。
+
+新模板开启预热与自评；**旧配置省略 `warmup` 或 `self_review` 时，相应功能保持关闭**。省略字符档、并发、模式、预算等字段则恢复其默认值。可选 `seed` 用于复现合成输入材料，不是模型采样种子；完整规则见使用说明。
+
+| 模型系列 | 关闭思考 | 开启思考 |
+|---|---|---|
+| DeepSeek | `{"thinking":{"type":"disabled"}}` | `{"thinking":{"type":"enabled"}}` |
+| Qwen | `{"chat_template_kwargs":{"enable_thinking":false}}` | `{"chat_template_kwargs":{"enable_thinking":true}}` |
+
+这些是脚本发送的 JSON 顶层字段，不加 `extra_body` 包装。识别忽略大小写，支持组织前缀和版本后缀；请求仍使用原名。名称识别不代表部署兼容性已验证，服务必须接受并正确实现相应参数。未知系列或无法识别的别名在发请求前拒绝。
+
+仅支持流式 Chat Completions 兼容接口。直接连接完整 HTTP(S) 地址，忽略系统代理，不跟随重定向；HTTPS 使用默认信任链校验证书，没有关闭证书验证的选项。命令行提示、报告和模型自评目前均为中文，英文 README 不代表增加了英文输出模式。
+
 ## 如何理解结果
 
 - **TTFT**：发起请求至首个非空语义文本，包含可识别的思考文本。
@@ -72,6 +116,19 @@ Windows 可将 `python3` 改为 `python`。如果没有配置文件，首次运�
 - **对照边界**：默认两种模式输出预算不同；同样字符数在不同模型下的 Token 数也可能不同。少量样本的 P95 与最高成功并发不能代表稳定尾延迟或绝对容量。
 
 所有延迟均为客户端观测，可能受到网络、网关、连接、排队和客户端资源影响，不代表服务端纯计算时间。本工具评估性能，不评估模型回答准确性。
+
+| 指标 | 计算口径 |
+|---|---|
+| E2E | 请求发起至协议完成、失败或超时；成功请求形成延迟分布 |
+| 单请求输出 tok/s | `(completion_tokens − 1) / 首末语义文本间隔（秒）` |
+| 平均 TPOT | `首末语义文本间隔（毫秒）/ (completion_tokens − 1)` |
+| 聚合输出 tok/s | 成功请求输出 Token 总数 / 各批最早发起至最后结束的时长之和 |
+| usage 覆盖率 | 成功请求中同时具有输入和输出 Token 计数的比例 |
+| P50 / P95 | 成功且该指标可计算的样本，采用 nearest-rank 分位数 |
+
+失败耗时保留在聚合吞吐分母。任一成功请求缺少输出 usage 或存在未决请求时，聚合吞吐为 `N/A`。少于 2 个输出 Token、单块文本、零生成间隔或缺少计数时，单请求速率为 `N/A`。`completion_tokens` 是服务的输出口径，不能直接当作最终回答 Token。
+
+预检不删参数重试。关闭思考却观测到思考内容或正数 reasoning Token 时停止该模式；开启思考但无证据时标记“实际模式未确认”。某组合全部失败时跳过该长度的更高并发；并发 1 全部失败还会跳过当前模式的更长输入，另一模式独立执行。普通预热失败保留记录并继续正式测试。
 
 ## 证据与隐私
 
@@ -85,9 +142,26 @@ Windows 可将 `python3` 改为 `python`。如果没有配置文件，首次运�
 python3 llm_benchmark.py report --input llm_benchmark_evidence_日期-时间-随机标识
 ```
 
+证据目录包含 `snapshot.json`、`requests.jsonl`、`summary.json` 和 `report.md`；启用自评时另有 `self_review.json`。重建根据快照和请求证据复算，不使用当前模型配置，不重发自评请求，也不续跑未完成的压测。
+
+## 常见问题
+
+| 现象 | 检查方式 |
+|---|---|
+| 首次生成配置后退出 | 填写配置后再次运行；该次没有测试请求 |
+| 401 / 403 | 检查 API Key 和服务访问权限 |
+| 未知模型系列 | 使用服务接受的 DeepSeek/Qwen 系列名称；自定义别名暂不支持显式适配器选择 |
+| 400 / 404 / 重定向 | 核对完整路径、思考字段和上下文/输出上限；不会自动删字段或跟随重定向 |
+| 请求超时 | 区分连接、读取空闲和总超时，再检查网络与服务，不直接归因于 GPU |
+| 输出速率或 TTFO 为 N/A | 检查 usage、流式时序和最终回答是否可识别；N/A 不等于 0 |
+| 思考行为不符 | 查看模式观测；HTTP 200 不能证明开关生效 |
+| 中断后如何处理 | Ctrl+C 保留部分结果；可从已落盘证据离线重建报告 |
+
+常用命令：`python3 llm_benchmark.py --version`、`python3 llm_benchmark.py run --help`、`python3 llm_benchmark.py --config 自选配置.jsonc --dry-run`。压测退出码 `0` 表示正式性能运行完成，`2` 表示错误、部分完成或首次创建配置，`130` 表示取消；预热和自评另看报告。离线重建成功返回 `0`，不代表历史压测完整成功。
+
 ## 反馈与许可
 
-欢迎通过仓库 Issues 反馈问题。请提供脚本版本、Python 版本、操作系统、模型系列和经过脱敏的错误信息，不要提交 API Key、真实服务地址或未经检查的运行证据。
+欢迎通过 [Issues](https://gitee.com/xum1983/inferpulse-bench/issues) 反馈问题，通过 Pull Request 改进文档和代码。复现信息与贡献约定见 [反馈与贡献指南](CONTRIBUTING.md)。
 
 Author: William Xu  
 Email: xum1983@gmail.com  
