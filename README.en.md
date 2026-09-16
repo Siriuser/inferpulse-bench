@@ -6,7 +6,7 @@ A standalone Python benchmark for locally deployed LLM services. Configure one m
 
 **Source version 1.8.0 · Python 3.9+ · Standard library only · MIT**
 
-[Download](https://gitee.com/xum1983/inferpulse-bench/releases/tag/v1.7.0) · [Sample report (mock service)](report.example.md) · [Contributing](CONTRIBUTING.md) · [☕ Support the author](SPONSOR.md)
+[Download](https://gitee.com/xum1983/inferpulse-bench/releases/tag/v1.8.0) · [Sample report (mock service)](report.example.md) · [Contributing](CONTRIBUTING.md) · [☕ Support the author](SPONSOR.md)
 
 CLI messages, generated reports and optional model self-review are currently in **Chinese**. This README provides English instructions; it does not enable an English output mode.
 
@@ -19,13 +19,13 @@ CLI messages, generated reports and optional model self-review are currently in 
 
 The products have separate versions and releases. Their configuration and evidence formats are not currently interchangeable. This repository's MIT license applies to Bench; the full product will state its license separately.
 
-The packaged release remains v1.7.0. Download the current 1.8.0 repository source for explicit thinking-adapter selection with deployment aliases and the report support link. Default benchmark settings and metric definitions are unchanged.
+The source and packaged release are both version 1.8.0, including explicit thinking-adapter selection for deployment aliases and the report support link. Default benchmark settings and metric definitions are unchanged.
 
 ## Quick start
 
 You need Python 3.9 or newer and network access to the target service. No `pip install`, activation key or runtime expiry is required.
 
-1. Download **`inferpulse-bench-1.7.0.zip`** from the [release page](https://gitee.com/xum1983/inferpulse-bench/releases/tag/v1.7.0) and extract it. It includes an empty-key `llm_benchmark.jsonc`. `SHA256SUMS.txt` is available alongside the ZIP.
+1. Download **`inferpulse-bench-1.8.0.zip`** from the [release page](https://gitee.com/xum1983/inferpulse-bench/releases/tag/v1.8.0) and extract it. It includes an empty-key `llm_benchmark.jsonc`. `SHA256SUMS.txt` is available alongside the ZIP.
 2. If using a source checkout instead, copy either `llm_benchmark.deepseek.example.jsonc` or `llm_benchmark.qwen.example.jsonc` to `llm_benchmark.jsonc` next to the script.
 3. Edit `model.name`, `model.api_url` and `model.api_key`. Use the exact model name accepted by the service and its **full Chat Completions URL**, not just the `/v1` base URL. Leave the key empty if authentication is not required.
 4. Open a terminal in that directory:
@@ -49,6 +49,7 @@ Save this complete configuration as `llm_benchmark.jsonc` and replace the connec
   "schema_version": "inferpulse.standalone.config/v1",
   "model": {
     "name": "Qwen3-8B", // Replace with the exact name accepted by your service
+    "thinking_adapter": "auto", // Use qwen or deepseek for a deployment alias
     "api_url": "http://127.0.0.1:8000/v1/chat/completions",
     "api_key": ""
   },
@@ -63,7 +64,7 @@ Save this complete configuration as `llm_benchmark.jsonc` and replace the connec
 }
 ```
 
-`127.0.0.1:8000` is a placeholder. Dry-run validates the plan, not connectivity. After the smoke test, restore a model-specific example or gradually expand the matrix.
+`127.0.0.1:8000` is a placeholder. Keep `auto` when the model name is recognizable; for a deployment alias, select `qwen` or `deepseek` according to the switch syntax accepted by the service. Dry-run validates the plan, not connectivity. After the smoke test, restore a model-specific example or gradually expand the matrix.
 
 ## Supported services and thinking modes
 
