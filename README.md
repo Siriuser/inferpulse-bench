@@ -6,7 +6,7 @@
 
 **源码版本：1.8.0 · Python 3.9+ · 零第三方依赖 · MIT**
 
-[下载运行包](https://gitee.com/xum1983/inferpulse-bench/releases/tag/v1.7.0) · [报告示例（模拟服务）](report.example.md) · [详细使用说明](使用说明.md) · [反馈与贡献](CONTRIBUTING.md) · [☕ 支持作者](SPONSOR.md)
+[下载运行包](https://gitee.com/xum1983/inferpulse-bench/releases/tag/v1.8.0) · [报告示例（模拟服务）](report.example.md) · [详细使用说明](使用说明.md) · [反馈与贡献](CONTRIBUTING.md) · [☕ 支持作者](SPONSOR.md)
 
 ## 产品与仓库定位
 
@@ -19,7 +19,7 @@ InferPulse 是 AI 模型服务性能与容量测试产品的统一名称。本�
 
 两者分别管理版本、下载包和发布记录。Bench 当前源码版本为 1.8.0，不代表图形界面产品的版本或发布状态；配置和证据格式目前不能直接互换。MIT 许可适用于本仓库内容，完整产品的许可将在其发布时单独说明。
 
-运行包仍为 v1.7.0；请下载当前 1.8.0 仓库源码使用部署别名的思考参数选择及报告末尾支持链接。默认测试矩阵和指标口径保持一致。
+源码与运行包版本均为 1.8.0，包含部署别名的思考参数选择及报告末尾支持链接。默认测试矩阵和指标口径保持一致。
 
 ## 快速开始
 
@@ -50,6 +50,7 @@ Windows 可将 `python3` 改为 `python`。如果没有配置文件，首次运�
   "schema_version": "inferpulse.standalone.config/v1",
   "model": {
     "name": "Qwen3-8B", // 替换为服务接受的完整模型名称
+    "thinking_adapter": "auto", // 部署别名可改为 qwen 或 deepseek
     "api_url": "http://127.0.0.1:8000/v1/chat/completions",
     "api_key": ""
   },
@@ -64,7 +65,7 @@ Windows 可将 `python3` 改为 `python`。如果没有配置文件，首次运�
 }
 ```
 
-服务需要鉴权时填写 Key，不需要时可留空。`127.0.0.1:8000` 是占位地址。`--dry-run` 只校验配置和显示计划，不验证连通性，也不会发请求。试跑完成后可从模型示例恢复完整矩阵，或逐步增加档位。
+服务需要鉴权时填写 Key，不需要时可留空。`127.0.0.1:8000` 是占位地址。模型名称能被识别时保留 `auto`；使用部署别名时，按服务接受的思考开关格式填写 `qwen` 或 `deepseek`。`--dry-run` 只校验配置和显示计划，不验证连通性，也不会发请求。试跑完成后可从模型示例恢复完整矩阵，或逐步增加档位。
 
 ## 主要功能
 
