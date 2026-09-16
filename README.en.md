@@ -1,36 +1,21 @@
 # InferPulse Bench
 
-#### Description
-InferPulse 系列的独立 Python 性能测试脚本。零第三方依赖，支持 DeepSeek/Qwen 思考模式核验、并发与输入长度阶梯、TTFT/TTFO/tok/s、中文报告及离线证据重建。图形界面产品 InferPulse 后续单独发布。
+A standalone Python benchmark for locally deployed LLM services. Python 3.9+ standard library only; no third-party dependencies.
 
-#### Software Architecture
-Software architecture description
+**Version 1.7.0 · MIT · Author: William Xu**
 
-#### Installation
+This repository contains the lightweight script edition, **InferPulse Bench** (`inferpulse-bench`). The full graphical product, **InferPulse** (`inferpulse`), will be published separately. Their versions, releases, configuration formats and evidence formats are separate.
 
-1.  xxxx
-2.  xxxx
-3.  xxxx
+## Quick start
 
-#### Instructions
+1. Copy either model-specific `.example.jsonc` file to `llm_benchmark.jsonc` next to the script.
+2. Set the model name, full Chat Completions API URL and API key.
+3. Run `python3 llm_benchmark.py --dry-run` to inspect the plan, then `python3 llm_benchmark.py` to benchmark.
 
-1.  xxxx
-2.  xxxx
-3.  xxxx
+Supports DeepSeek/Qwen thinking-mode parameters, mode preflight, separate warmup, configurable input-character/concurrency tiers, TTFT, TTFO, E2E, output throughput, Chinese Markdown reports and offline report reconstruction. The deployment must accept the selected thinking parameters.
 
-#### Contribution
+Input tiers count characters, not tokens. Token counts come only from server usage. Requests run in batches at concurrency 1–10; this is not a sustained-load capacity test. The default thinking/non-thinking output budgets differ. Optional model-written self-reviews are not independently verified conclusions.
 
-1.  Fork the repository
-2.  Create Feat_xxx branch
-3.  Commit your code
-4.  Create Pull Request
+Runtime configuration contains your API key and is excluded by `.gitignore`. Inspect reports and evidence before sharing them. Read the [Chinese README](README.md) and [usage guide](使用说明.md) for full details.
 
-
-#### Gitee Feature
-
-1.  You can use Readme\_XXX.md to support different languages, such as Readme\_en.md, Readme\_zh.md
-2.  Gitee blog [blog.gitee.com](https://blog.gitee.com)
-3.  Explore open source project [https://gitee.com/explore](https://gitee.com/explore)
-4.  The most valuable open source project [GVP](https://gitee.com/gvp)
-5.  The manual of Gitee [https://gitee.com/help](https://gitee.com/help)
-6.  The most popular members  [https://gitee.com/gitee-stars/](https://gitee.com/gitee-stars/)
+Email: xum1983@gmail.com · [MIT License](LICENSE) · Copyright (c) 2026 William Xu
