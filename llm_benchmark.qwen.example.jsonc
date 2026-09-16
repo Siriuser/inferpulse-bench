@@ -1,0 +1,64 @@
+{
+  // 填写模型名称、完整 API 地址和 API Key；其余设置可按需调整。
+  "schema_version": "inferpulse.standalone.config/v1",
+  "model": {
+    "name": "Qwen3.8-27B",
+    "api_url": "http://127.0.0.1:8000/v1/chat/completions",
+    "api_key": ""
+  },
+
+
+  // 思考模式："off" 关闭、"on" 开启；至少保留一项，始终先 off 后 on。
+  "thinking_modes": [
+    "off",
+    "on",
+  ],
+
+  // 输入字符阶梯（不是 Token）；用 // 注释掉不测的行，至少保留一项。
+  "input_characters": [
+    1024,
+    2048,
+    4096,
+    8192,
+    16384,
+    32768,
+    65536,
+    // 更长输入默认关闭；取消对应行的 // 可启用，1M = 1048576 字符。
+    // 131072,
+    // 262144,
+    // 524288,
+    // 1048576,
+  ],
+
+  // 并发阶梯；用 // 注释掉不测的行，至少保留一项。
+  "concurrency": [
+    1,
+    5,
+    10,
+  ],
+
+  // 性能请求输出 Token 上限（1～65536 整数）；off 关闭思考，on 开启思考。
+  "output_tokens": {
+    "off": 512,
+    "on": 4096
+  },
+
+  // 每组合轮数（1～1000 整数）；每轮同时发送对应并发数的请求。
+  "repetitions": 3,
+
+  // 独立预热；每种模式、每个字符档串行请求指定次数（1～1000），沿用对应输出预算，不计入性能统计。
+  "warmup": {
+    "enabled": true,
+    "requests_per_length": 1
+  },
+
+  // 超时（秒）；connect_seconds 为连接，read_seconds 为读取空闲，total_seconds 为单请求总耗时。
+  "timeouts": {
+    "connect_seconds": 10,
+    "read_seconds": 120,
+    "total_seconds": 600
+  },
+
+  // 测试后额外请求一次模型自评并保存其文字；不计入性能统计，false 可关闭。
+  "self_review": true,
+}

@@ -1,0 +1,18 @@
+# Local model credentials
+llm_benchmark.json
+llm_benchmark.jsonc
+.env
+.env.*
+
+# Runtime evidence and reports
+llm_benchmark_evidence_*/
+llm_benchmark_report_*.md
+*.log
+
+# Python and local editor files
+__pycache__/
+*.py[cod]
+.venv/
+.DS_Store
+.idea/
+.vscode/
