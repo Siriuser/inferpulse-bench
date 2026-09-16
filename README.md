@@ -4,9 +4,9 @@
 
 面向内网部署与交付场景的轻量大模型性能测试工具。填写模型连接信息，自动完成思考模式核验、分档测试，并生成可复核的中文报告。
 
-**当前版本：1.7.0 · Python 3.9+ · 零第三方依赖 · MIT**
+**源码版本：1.7.1 · Python 3.9+ · 零第三方依赖 · MIT**
 
-[下载运行包](https://gitee.com/xum1983/inferpulse-bench/releases/tag/v1.7.0) · [报告示例（模拟服务）](report.example.md) · [详细使用说明](使用说明.md) · [反馈与贡献](CONTRIBUTING.md)
+[下载运行包](https://gitee.com/xum1983/inferpulse-bench/releases/tag/v1.7.0) · [报告示例（模拟服务）](report.example.md) · [详细使用说明](使用说明.md) · [反馈与贡献](CONTRIBUTING.md) · [☕ 支持作者](SPONSOR.md)
 
 ## 产品与仓库定位
 
@@ -17,7 +17,9 @@ InferPulse 是 AI 模型服务性能与容量测试产品的统一名称。本�
 | **InferPulse Bench** | `inferpulse-bench` | 本仓库；独立 Python 脚本，通过配置文件运行，生成中文报告 |
 | **InferPulse** | [`inferpulse`](https://gitee.com/xum1983/inferpulse) | 带图形界面的完整产品；已建立占位仓库，代码与安装包尚未公开发布 |
 
-两者分别管理版本、下载包和发布记录。Bench 当前版本为 1.7.0，不代表图形界面产品的版本或发布状态；配置和证据格式目前不能直接互换。MIT 许可适用于本仓库内容，完整产品的许可将在其发布时单独说明。
+两者分别管理版本、下载包和发布记录。Bench 当前源码版本为 1.7.1，不代表图形界面产品的版本或发布状态；配置和证据格式目前不能直接互换。MIT 许可适用于本仓库内容，完整产品的许可将在其发布时单独说明。
+
+运行包仍为 v1.7.0；如需 1.7.1 新增的报告末尾自愿支持链接，请下载当前仓库源码。测试参数和指标口径保持一致。
 
 ## 快速开始
 
@@ -143,6 +145,8 @@ python3 llm_benchmark.py report --input llm_benchmark_evidence_日期-时间-随
 ```
 
 证据目录包含 `snapshot.json`、`requests.jsonl`、`summary.json` 和 `report.md`；启用自评时另有 `self_review.json`。重建根据快照和请求证据复算，不使用当前模型配置，不重发自评请求，也不续跑未完成的压测。
+
+1.7.1 的报告末尾包含一段自愿支持说明，链接到 [支持作者页面](SPONSOR.md)。该段位于数据说明及模型自评之后；生成与离线重建不访问链接，不改变模型请求或机器证据。支持完全自愿，不影响任何功能的使用。
 
 ## 常见问题
 
