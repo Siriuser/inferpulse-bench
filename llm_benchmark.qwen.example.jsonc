@@ -3,6 +3,8 @@
   "schema_version": "inferpulse.standalone.config/v1",
   "model": {
     "name": "Qwen3.8-27B",
+    // 思考参数方案：auto 按名称识别；部署别名可指定 qwen 或 deepseek。
+    "thinking_adapter": "auto",
     "api_url": "http://127.0.0.1:8000/v1/chat/completions",
     "api_key": ""
   },
