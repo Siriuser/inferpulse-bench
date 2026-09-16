@@ -4,7 +4,10 @@
 >
 > [中文说明](README.md) · [English instructions](README.en.md)
 
-# 大模型性能测试报告（模拟服务示例）
+> 2026-09-16 使用 1.7.1 从原模拟证据离线重建，新增报告末尾支持链接；未重新压测。
+> Rebuilt offline with 1.7.1 from the original mock evidence to include the support footer; no benchmark was rerun.
+
+# 大模型性能测试报告
 
 - 模型：Qwen-mock-documentation
 - 服务：`http://127.0.0.1:61812/v1/chat/completions`
@@ -109,3 +112,7 @@
 - 达到输出上限可属于协议成功；截断、最终回答缺失和未知分别保留。最高成功并发不代表绝对容量或模式已经验证。
 - 请求使用不同前缀，但不能强制关闭服务端缓存。固定执行顺序、不同输出预算和服务默认参数也可能影响对照。
 - N/A 表示缺少计算所需的完整观测，不表示 0；原始状态和原因保存在 requests.jsonl，分布样本数保存在 summary.json。
+
+---
+
+如果你觉得 InferPulse Bench 帮到了你，欢迎[打开支持页面](https://gitee.com/xum1983/inferpulse-bench/blob/master/SPONSOR.md)，请作者喝一杯瑞幸咖啡。支持全凭自愿，不影响任何功能的使用。你的使用、分享和反馈，同样值得感谢。
