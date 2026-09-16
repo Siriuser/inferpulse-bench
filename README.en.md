@@ -4,7 +4,7 @@
 
 A standalone Python benchmark for locally deployed LLM services. Configure one model, check its thinking-mode behavior, test input sizes and concurrency levels, and generate a report backed by request-level evidence.
 
-**Source version 1.7.1 · Python 3.9+ · Standard library only · MIT**
+**Source version 1.8.0 · Python 3.9+ · Standard library only · MIT**
 
 [Download](https://gitee.com/xum1983/inferpulse-bench/releases/tag/v1.7.0) · [Sample report (mock service)](report.example.md) · [Contributing](CONTRIBUTING.md) · [☕ Support the author](SPONSOR.md)
 
@@ -19,7 +19,7 @@ CLI messages, generated reports and optional model self-review are currently in 
 
 The products have separate versions and releases. Their configuration and evidence formats are not currently interchangeable. This repository's MIT license applies to Bench; the full product will state its license separately.
 
-The packaged release remains v1.7.0. Download the current repository source for the voluntary support link added to reports in 1.7.1. Benchmark settings and metric definitions are unchanged.
+The packaged release remains v1.7.0. Download the current 1.8.0 repository source for explicit thinking-adapter selection with deployment aliases and the report support link. Default benchmark settings and metric definitions are unchanged.
 
 ## Quick start
 
@@ -67,16 +67,29 @@ Save this complete configuration as `llm_benchmark.jsonc` and replace the connec
 
 ## Supported services and thinking modes
 
-Bench sends streaming requests to an **OpenAI-compatible Chat Completions endpoint**. It selects the following syntax by model family:
+Bench sends streaming requests to an **OpenAI-compatible Chat Completions endpoint**. By default it selects the following syntax by model name; version 1.8.0 also allows an explicit adapter:
 
-| Family | Thinking off | Thinking on |
+| Adapter | Thinking off | Thinking on |
 |---|---|---|
 | DeepSeek | `{"thinking":{"type":"disabled"}}` | `{"thinking":{"type":"enabled"}}` |
 | Qwen | `{"chat_template_kwargs":{"enable_thinking":false}}` | `{"chat_template_kwargs":{"enable_thinking":true}}` |
 
-These are top-level JSON fields, without an `extra_body` wrapper. Matching is case-insensitive and supports organization prefixes and version suffixes, such as `deepseek-ai/DeepSeek-V3.2-Exp` and `Qwen/Qwen3-8B`. The original name is sent unchanged. Unknown families or unrecognized aliases are rejected before any request.
+These are top-level JSON fields, without an `extra_body` wrapper. Matching is case-insensitive and supports organization prefixes and version suffixes, such as `deepseek-ai/DeepSeek-V3.2-Exp` and `Qwen/Qwen3-8B`. The original name is sent unchanged. If `auto` cannot recognize a name, Bench stops before any request and asks you to select an adapter.
 
-Family recognition selects syntax; it does **not** certify deployment compatibility. Each selected mode has its own preflight. Rejected parameters are not removed and retried. Thinking observed while requesting off stops that mode. Requesting on without observable evidence is marked **unconfirmed**. HTTP 200, or the absence of visible reasoning, does not prove that a switch worked.
+Automatic recognition and explicit adapter selection choose request syntax; they do **not** certify deployment compatibility. Each selected mode has its own preflight. Rejected parameters are not removed and retried. Thinking observed while requesting off stops that mode. Requesting on without observable evidence is marked **unconfirmed**. HTTP 200, or the absence of visible reasoning, does not prove that a switch worked.
+
+Set optional `model.thinking_adapter` to `auto` (default), `qwen` or `deepseek`, using lowercase values. An explicit selection takes precedence over the model name and describes the service's accepted switch format, not the model's identity. For example, a service named `production-llm` that accepts `chat_template_kwargs.enable_thinking` can use:
+
+```jsonc
+"model": {
+  "name": "production-llm",
+  "thinking_adapter": "qwen",
+  "api_url": "http://127.0.0.1:8000/v1/chat/completions",
+  "api_key": ""
+}
+```
+
+The original name is sent unchanged. Preflight, warmup, performance requests and self-review use the same adapter. Bench never probes another adapter or removes rejected fields. Existing configurations that omit the option keep automatic recognition; the new field requires Bench 1.8.0 or newer. Dry-run, reports and evidence show the resolved adapter and its selection source. Offline reconstruction uses saved records, without loading current settings or recognizing the name again. Older snapshots explicitly report that the adapter and source were not recorded, while retaining their saved mode parameters.
 
 Requests connect directly to the full HTTP(S) URL. System proxies are not used and redirects are not followed. HTTPS uses the default certificate trust store; there is no option to disable certificate verification. Sampling parameters and thinking effort use server defaults.
 
@@ -86,6 +99,7 @@ JSONC supports `//` line comments, `/* ... */` block comments and trailing comma
 
 | Setting | New template default | Supported values / meaning |
 |---|---|---|
+| `model.thinking_adapter` | `auto` | `auto`, `qwen`, `deepseek`; explicit selection overrides name recognition |
 | `thinking_modes` | `["off", "on"]` | One or both; off always runs first |
 | `input_characters` | 1024, 2048, 4096, 8192, 16384, 32768, 65536 | Unique integers from 128 to 1048576; ascending order |
 | `concurrency` | `[1, 5, 10]` | Unique integers from 1 to 10, e.g. `[1, 2, 4, 6, 10]`; ascending order |
@@ -173,7 +187,7 @@ Since 1.7.1, reports end with a short optional [support-the-author link](SPONSOR
 |---|---|
 | First run creates a file and exits | Fill the generated configuration, then run again; no benchmark was sent |
 | HTTP 401 / 403 | API key and service access permissions |
-| Unknown model family | Use an accepted DeepSeek/Qwen name; custom aliases have no explicit adapter override |
+| Unknown model family | Keep the accepted service name and set `model.thinking_adapter` to `qwen` or `deepseek` for its switch format (1.8.0+) |
 | HTTP 400 / 404 or redirect | Full path, thinking fields, context limits and output cap; fields are not dropped and redirects are not followed |
 | Timeout | Distinguish connection, read-idle and total timeout; inspect network and service behavior |
 | Output speed or TTFO is N/A | Check usage, multiple observable text arrivals and identifiable final-answer output |
