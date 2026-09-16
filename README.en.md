@@ -4,9 +4,9 @@
 
 A standalone Python benchmark for locally deployed LLM services. Configure one model, check its thinking-mode behavior, test input sizes and concurrency levels, and generate a report backed by request-level evidence.
 
-**Version 1.7.0 · Python 3.9+ · Standard library only · MIT**
+**Source version 1.7.1 · Python 3.9+ · Standard library only · MIT**
 
-[Download](https://gitee.com/xum1983/inferpulse-bench/releases/tag/v1.7.0) · [Sample report (mock service)](report.example.md) · [Contributing](CONTRIBUTING.md)
+[Download](https://gitee.com/xum1983/inferpulse-bench/releases/tag/v1.7.0) · [Sample report (mock service)](report.example.md) · [Contributing](CONTRIBUTING.md) · [☕ Support the author](SPONSOR.md)
 
 CLI messages, generated reports and optional model self-review are currently in **Chinese**. This README provides English instructions; it does not enable an English output mode.
 
@@ -18,6 +18,8 @@ CLI messages, generated reports and optional model self-review are currently in 
 | **InferPulse** | [`inferpulse`](https://gitee.com/xum1983/inferpulse) | Full graphical product; placeholder repository reserved, code and installers not yet publicly released |
 
 The products have separate versions and releases. Their configuration and evidence formats are not currently interchangeable. This repository's MIT license applies to Bench; the full product will state its license separately.
+
+The packaged release remains v1.7.0. Download the current repository source for the voluntary support link added to reports in 1.7.1. Benchmark settings and metric definitions are unchanged.
 
 ## Quick start
 
@@ -162,6 +164,8 @@ python3 llm_benchmark.py report --input PATH_TO_EVIDENCE
 Reconstruction uses the saved snapshot and request records, not the current connection configuration. Saved self-review is reused without another model call. Keep evidence files together and retain originals for auditing.
 
 Keys remain in plaintext in the local runtime configuration, which is ignored by Git. Keys and benchmark prompt, reasoning and answer bodies are not written to evidence. **Self-review saves its final review text.** Reports and evidence can still contain endpoints, model names, hashes and timing metadata; inspect them before sharing. Do not upload real configurations or unchecked evidence to Issues.
+
+Since 1.7.1, reports end with a short optional [support-the-author link](SPONSOR.md), after measurement notes and any model self-review. Rendering and offline reconstruction never visit the link. The note is excluded from model input and machine-readable evidence, and payment is never required to use any feature.
 
 ## Troubleshooting
 
