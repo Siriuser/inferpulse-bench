@@ -27,17 +27,19 @@ from datetime import datetime, timezone
 from pathlib import Path
 from urllib.parse import urlsplit
 
-VERSION = "1.7.1"
+VERSION = "1.8.0"
 SUPPORT_URL = "https://gitee.com/xum1983/inferpulse-bench/blob/master/SPONSOR.md"
 CONFIG_VERSION = "inferpulse.standalone.config/v1"
 EVIDENCE_VERSION = "inferpulse.standalone.evidence/v1"
 MODES = ("off", "on")
 MODE_LABELS = {"off": "关闭思考", "on": "开启思考"}
+THINKING_ADAPTERS = ("auto", "deepseek", "qwen")
 DEFAULT_CHARACTERS = [1024, 2048, 4096, 8192, 16384, 32768, 65536]
 OPTIONAL_CHARACTERS = [131072, 262144, 524288, 1048576]
 DEFAULT_CONFIG_NAME = "llm_benchmark.jsonc"
 DEFAULT_MODEL = {
     "name": "DeepSeek-V4-Flash-0731",
+    "thinking_adapter": "auto",
     "api_url": "http://127.0.0.1:8000/v1/chat/completions",
     "api_key": "",
 }
@@ -80,17 +82,42 @@ def utc_now():
     return datetime.now(timezone.utc).isoformat()
 
 
+def validate_model_name(name):
+    if (
+        not isinstance(name, str)
+        or not name.strip()
+        or len(name) > 200
+        or any(ord(char) < 32 or ord(char) == 127 for char in name)
+    ):
+        raise BenchmarkError("model.name 必须是有效的模型名称")
+
+
 def model_family(name):
     """Select request syntax by family name, without claiming deployment compatibility."""
-    if not isinstance(name, str) or not name or len(name) > 200:
-        raise BenchmarkError("model.name 必须是有效的模型名称")
+    validate_model_name(name)
     short = name.rsplit("/", 1)[-1]
     match = re.fullmatch(
         r"(deepseek|qwen)(?:[0-9][a-z0-9._-]*|[-_.][a-z0-9][a-z0-9._-]*)?", short, re.I
     )
     if match:
         return match[1].lower()
-    raise BenchmarkError("无法识别模型系列；模型名称需为 DeepSeek 或 Qwen 系列，可带组织前缀")
+    raise BenchmarkError(
+        "无法识别模型系列；请按服务接受的思考参数设置 model.thinking_adapter 为 deepseek 或 qwen，"
+        "model.name 保留服务实际接受的名称"
+    )
+
+
+def resolve_thinking_adapter(model):
+    """Explicit request syntax takes precedence over the unchanged service model name."""
+    validate_model_name(model["name"])
+    requested = model.get("thinking_adapter", "auto")
+    if not isinstance(requested, str) or requested not in THINKING_ADAPTERS:
+        raise BenchmarkError("model.thinking_adapter 只允许 auto、deepseek 或 qwen")
+    return {
+        "requested": requested,
+        "resolved": model_family(model["name"]) if requested == "auto" else requested,
+        "source": "model_name" if requested == "auto" else "explicit",
+    }
 
 
 def mode_parameters(family, mode):
@@ -101,6 +128,10 @@ def mode_parameters(family, mode):
     if family == "qwen":
         return {"chat_template_kwargs": {"enable_thinking": mode == "on"}}
     raise BenchmarkError("未知模型适配规则")
+
+
+def request_mode_parameters(config, mode):
+    return mode_parameters(resolve_thinking_adapter(config["model"])["resolved"], mode)
 
 
 def check_keys(value, allowed, required, location):
@@ -114,7 +145,7 @@ def integer(value, low, high, location):
     return value
 
 
-def validate_config(raw):
+def validate_config(raw, *, resolve_adapter=True):
     """Normalize public settings, dropping credentials before they reach the runner or evidence."""
     if isinstance(raw, dict) and "license_key" in raw:
         raise BenchmarkError("license_key 已移除，请从配置中删除该字段后重新运行")
@@ -141,11 +172,16 @@ def validate_config(raw):
     model = raw["model"]
     check_keys(
         model,
-        {"name", "api_url", "api_key"},
+        {"name", "thinking_adapter", "api_url", "api_key"},
         {"name", "api_url"},
         "model（只允许一个对象）",
     )
-    model_family(model["name"])
+    validate_model_name(model["name"])
+    requested_adapter = model.get("thinking_adapter", "auto")
+    if not isinstance(requested_adapter, str) or requested_adapter not in THINKING_ADAPTERS:
+        raise BenchmarkError("model.thinking_adapter 只允许 auto、deepseek 或 qwen")
+    if resolve_adapter:
+        resolve_thinking_adapter(model)
     if "api_key" in model and (
         not isinstance(model["api_key"], str) or any(char in model["api_key"] for char in "\r\n")
     ):
@@ -170,7 +206,11 @@ def validate_config(raw):
         raise BenchmarkError("api_url 必须是完整 HTTP(S) 地址，不含凭据、查询或片段") from None
     result = {
         "schema_version": CONFIG_VERSION,
-        "model": {key: model[key] for key in ("name", "api_url")},
+        "model": {
+            "name": model["name"],
+            "thinking_adapter": requested_adapter,
+            "api_url": model["api_url"],
+        },
     }
     for key, default, low, high in (
         ("input_characters", DEFAULT_CHARACTERS, 128, OPTIONAL_CHARACTERS[-1]),
@@ -282,6 +322,8 @@ def config_template(raw=None):
     if raw is not None:
         template.update(raw)
     validate_config(template)
+    template["model"] = dict(template["model"])
+    template["model"].setdefault("thinking_adapter", "auto")
     comments = {
         "input_characters": "输入字符阶梯（不是 Token）；用 // 注释掉不测的行，至少保留一项。",
         "concurrency": "并发阶梯；用 // 注释掉不测的行，至少保留一项。",
@@ -298,7 +340,20 @@ def config_template(raw=None):
     for key, value in template.items():
         if key in comments:
             lines += ["", "  // " + comments[key]]
-        if isinstance(value, list):
+        if key == "model":
+            lines.append('  "model": {')
+            for field in ("name", "thinking_adapter", "api_url", "api_key"):
+                if field not in value:
+                    continue
+                if field == "thinking_adapter":
+                    lines.append(
+                        "    // 思考参数方案：auto 按名称识别；部署别名可指定 qwen 或 deepseek。"
+                    )
+                lines.append(
+                    f'    "{field}": ' + json.dumps(value[field], ensure_ascii=False) + ","
+                )
+            lines.append("  },")
+        elif isinstance(value, list):
             lines.append('  "' + key + '": [')
             lines += ["    " + json.dumps(item, ensure_ascii=False) + "," for item in value]
             if key == "input_characters":
@@ -800,7 +855,7 @@ def execute_batch(config, cell, round_number, phase, writer, pool, credential, c
     for ordinal in range(cell["concurrency"]):
         request_id = f"{batch_id}-q{ordinal + 1}"
         prompt = make_prompt(cell["input_characters"], config["seed"], request_id)
-        parameters = mode_parameters(model_family(config["model"]["name"]), cell["mode"])
+        parameters = request_mode_parameters(config, cell["mode"])
         body = json.dumps(
             {
                 "model": config["model"]["name"],
@@ -931,7 +986,29 @@ def load_evidence(directory):
         or snapshot.get("schema_version") != "inferpulse.standalone.snapshot/v1"
     ):
         raise BenchmarkError("不支持的快照版本")
-    config = validate_config(snapshot.get("config"))
+    # Rebuild from frozen evidence, never from current model-name recognition rules.
+    config = validate_config(snapshot.get("config"), resolve_adapter=False)
+    if "thinking_adapter" in snapshot:
+        adapter = snapshot["thinking_adapter"]
+        check_keys(
+            adapter,
+            {"requested", "resolved", "source"},
+            {"requested", "resolved", "source"},
+            "快照思考参数方案",
+        )
+        requested = config["model"]["thinking_adapter"]
+        if (
+            adapter["requested"] != requested
+            or adapter["resolved"] not in THINKING_ADAPTERS[1:]
+            or adapter["source"] != ("model_name" if requested == "auto" else "explicit")
+            or (requested != "auto" and adapter["resolved"] != requested)
+            or snapshot.get("mode_parameters")
+            != {
+                mode: mode_parameters(adapter["resolved"], mode)
+                for mode in config["thinking_modes"]
+            }
+        ):
+            raise BenchmarkError("快照思考参数方案与配置或已保存参数不一致")
     validate_report_name(snapshot.get("report_file"))
     if snapshot.get("cells") != make_cells(config):
         raise BenchmarkError("快照矩阵与配置不一致")
@@ -1096,6 +1173,7 @@ def summarize(snapshot, records, warnings):
         "run_id": snapshot["run_id"],
         "created_at": snapshot["created_at"],
         "config": snapshot["config"],
+        "thinking_adapter": snapshot.get("thinking_adapter"),
         "status": run_state,
         "modes": mode_status,
         "planned_cells": len(rows),
@@ -1219,7 +1297,7 @@ def write_self_review(summary, directory, credential, controller):
         record.update(status="skipped", reason=reason)
         atomic_json(target, record)
         return
-    parameters = mode_parameters(model_family(config["model"]["name"]), "off")
+    parameters = request_mode_parameters(config, "off")
     body = json.dumps(
         {
             "model": config["model"]["name"],
@@ -1424,11 +1502,17 @@ def render_warmup(warmup):
 
 def render_report(summary):
     config = summary["config"]
+    adapter = summary.get("thinking_adapter")
+    adapter_note = "历史快照未记录方案及选择来源；实际请求字段见各模式参数。"
+    if adapter:
+        source = "按模型名称自动识别" if adapter["source"] == "model_name" else "配置显式指定"
+        adapter_note = f"{adapter['resolved']}（{source}；配置值 {adapter['requested']}）。"
     lines = [
         "# 大模型性能测试报告",
         "",
         "- 模型：" + md(config["model"]["name"]),
         "- 服务：`" + md(config["model"]["api_url"]) + "`",
+        "- 思考参数方案：" + adapter_note,
         "- Run：`" + summary["run_id"] + "`；UTC：" + summary["created_at"],
         "- 执行状态：" + summary["status"],
         f"- 输入单位：字符；最高 {max(config['input_characters'])} 字符，"
@@ -1641,11 +1725,11 @@ def run_benchmark(config, directory, credential, controller=None, report_file=No
         "created_at": utc_now(),
         "report_file": validate_report_name(report_file),
         "config": config,
+        "thinking_adapter": resolve_thinking_adapter(config["model"]),
         "cells": cells,
         "warmups": make_warmups(config),
         "mode_parameters": {
-            mode: mode_parameters(model_family(config["model"]["name"]), mode)
-            for mode in config["thinking_modes"]
+            mode: request_mode_parameters(config, mode) for mode in config["thinking_modes"]
         },
     }
     directory = Path(directory)
@@ -1837,6 +1921,7 @@ def main(argv=None):
                 json.dumps(
                     {
                         "model": config["model"]["name"],
+                        "thinking_adapter": resolve_thinking_adapter(config["model"]),
                         "input_unit": "characters",
                         "input_characters": config["input_characters"],
                         "concurrency": config["concurrency"],
@@ -1862,7 +1947,7 @@ def main(argv=None):
                         "self_review": config["self_review"],
                         "self_review_requests_max": 1 if config["self_review"] else 0,
                         "mode_parameters": {
-                            mode: mode_parameters(model_family(config["model"]["name"]), mode)
+                            mode: request_mode_parameters(config, mode)
                             for mode in config["thinking_modes"]
                         },
                     },
