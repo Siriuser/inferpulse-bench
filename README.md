@@ -6,7 +6,7 @@
 
 **源码版本：1.8.0 · Python 3.9+ · 零第三方依赖 · MIT**
 
-[下载运行包](https://gitee.com/xum1983/inferpulse-bench/releases/tag/v1.8.0) · [报告示例（模拟服务）](report.example.md) · [详细使用说明](使用说明.md) · [反馈与贡献](CONTRIBUTING.md) · [☕ 支持作者](SPONSOR.md)
+[下载运行包](https://gitee.com/xum1983/inferpulse-bench/releases/tag/v1.8.0) · [Markdown 报告示例](report.example.md) · [HTML 报告](report.example.html) · [PDF 报告](report.example.pdf) · [详细使用说明](使用说明.md) · [反馈与贡献](CONTRIBUTING.md) · [☕ 支持作者](SPONSOR.md)
 
 ## 产品与仓库定位
 
@@ -20,6 +20,16 @@ InferPulse 是 AI 模型服务性能与容量测试产品的统一名称。本�
 两者分别管理版本、下载包和发布记录。Bench 当前源码版本为 1.8.0，不代表图形界面产品的版本或发布状态；配置和证据格式目前不能直接互换。MIT 许可适用于本仓库内容，完整产品的许可将在其发布时单独说明。
 
 源码与运行包版本均为 1.8.0，包含部署别名的思考参数选择及报告末尾支持链接。默认测试矩阵和指标口径保持一致。
+
+## HTML / PDF 报告预览
+
+[下载 HTML](report.example.html) · [查看 PDF](report.example.pdf)
+
+下载 HTML 后直接用浏览器打开，无需联网或安装依赖；支持 A4 纵向打印及保存为 PDF。报告采用浅色版式，全部内容平铺，包含双模式对照、性能变化分析、模型自评和末尾附录，共 12 页。打印时使用 100% 比例，并关闭浏览器额外页眉页脚。
+
+![报告首页](report.preview.png)
+
+当前文件用于评估报告版式与阅读效果，使用合成数据及自评文案，不代表真实模型成绩。HTML 生成与配置切换尚未接入 1.8.0，现有命令行仍输出 Markdown；本次不变更程序版本或运行包。
 
 ## 快速开始
 
