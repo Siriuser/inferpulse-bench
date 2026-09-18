@@ -7,6 +7,7 @@ llm_benchmark.jsonc
 # Runtime evidence and reports
 llm_benchmark_evidence_*/
 llm_benchmark_report_*.md
+llm_benchmark_report_*.html
 *.log
 
 # Python and local editor files
