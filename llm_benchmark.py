@@ -10,6 +10,7 @@ import codecs
 import concurrent.futures
 import contextlib
 import hashlib
+import html
 import http.client
 import json
 import math
@@ -27,13 +28,14 @@ from datetime import datetime, timezone
 from pathlib import Path
 from urllib.parse import urlsplit
 
-VERSION = "1.8.0"
+VERSION = "1.9.0"
 SUPPORT_URL = "https://gitee.com/xum1983/inferpulse-bench/blob/master/SPONSOR.md"
 CONFIG_VERSION = "inferpulse.standalone.config/v1"
 EVIDENCE_VERSION = "inferpulse.standalone.evidence/v1"
 MODES = ("off", "on")
 MODE_LABELS = {"off": "关闭思考", "on": "开启思考"}
 THINKING_ADAPTERS = ("auto", "deepseek", "qwen")
+REPORT_FORMATS = ("md", "html")
 DEFAULT_CHARACTERS = [1024, 2048, 4096, 8192, 16384, 32768, 65536]
 OPTIONAL_CHARACTERS = [131072, 262144, 524288, 1048576]
 DEFAULT_CONFIG_NAME = "llm_benchmark.jsonc"
@@ -163,6 +165,7 @@ def validate_config(raw, *, resolve_adapter=True):
             "seed",
             "self_review",
             "warmup",
+            "report_formats",
         },
         {"schema_version", "model"},
         "配置",
@@ -269,6 +272,15 @@ def validate_config(raw, *, resolve_adapter=True):
     if type(raw.get("self_review", False)) is not bool:
         raise BenchmarkError("self_review 必须是 true 或 false")
     result["self_review"] = raw.get("self_review", False)
+    formats = raw.get("report_formats", list(REPORT_FORMATS))
+    if (
+        not isinstance(formats, list)
+        or not formats
+        or any(not isinstance(value, str) or value not in REPORT_FORMATS for value in formats)
+        or len(set(formats)) != len(formats)
+    ):
+        raise BenchmarkError("report_formats 必须是非空数组，只允许 md、html，且不能重复")
+    result["report_formats"] = [value for value in REPORT_FORMATS if value in formats]
     return result
 
 
@@ -318,6 +330,7 @@ def config_template(raw=None):
         "warmup": {"enabled": True, "requests_per_length": 1},
         "timeouts": {"connect_seconds": 10, "read_seconds": 120, "total_seconds": 600},
         "self_review": True,
+        "report_formats": list(REPORT_FORMATS),
     }
     if raw is not None:
         template.update(raw)
@@ -335,6 +348,8 @@ def config_template(raw=None):
         "timeouts": "超时（秒）；connect_seconds 为连接，read_seconds 为读取空闲，"
         "total_seconds 为单请求总耗时。",
         "self_review": "测试后额外请求一次模型自评并保存其文字；不计入性能统计，false 可关闭。",
+        "report_formats": "报告格式：默认同时生成 md 和 html；"
+        "用 // 注释掉不需要的行，至少保留一项。",
     }
     lines = ["{", "  // 填写模型名称、完整 API 地址和 API Key；其余设置可按需调整。"]
     for key, value in template.items():
@@ -988,6 +1003,9 @@ def load_evidence(directory):
         raise BenchmarkError("不支持的快照版本")
     # Rebuild from frozen evidence, never from current model-name recognition rules.
     config = validate_config(snapshot.get("config"), resolve_adapter=False)
+    # Published snapshots before 1.9.0 only produced Markdown. Do not change their output policy.
+    if "report_formats" not in snapshot["config"]:
+        config["report_formats"] = ["md"]
     if "thinking_adapter" in snapshot:
         adapter = snapshot["thinking_adapter"]
         check_keys(
@@ -1500,6 +1518,37 @@ def render_warmup(warmup):
     return lines + [""]
 
 
+def measurement_notes(summary):
+    return [
+        "TTFT 包括可识别的思考文本；TTFO 是首个可识别的最终回答。"
+        "只有思考、没有最终回答或无法区分时，TTFO 为 N/A。",
+        "所有耗时来自客户端单调时钟，包括连接、网络、网关、排队与处理；不是服务端纯计算时间。"
+        "预检、独立预热、生成材料、序列化与落盘不计入性能窗口。",
+        "各组合测量窗口为每批最早请求发起至最后请求结束的时长之和；失败耗时保留在分母。",
+        "单请求输出 tok/s = (服务输出 Token − 1) / 首末语义文本间隔（秒）；"
+        "TPOT 为其倒数，以 ms/Token 表示。尾部 usage 和结束标记不延长生成时间。",
+        "聚合输出 tok/s = 成功请求输出 Token 总数 / 组合测量窗口；"
+        "任一成功请求缺少输出 usage 或存在未决请求时为 N/A。",
+        "Token 仅采用服务 usage；字符数与 SSE 分块数不是 Token 数。"
+        "completion_tokens 按服务口径展示，不能直接称为最终回答 Token。",
+        "单块输出、少于 2 Token、零生成间隔或缺失 usage 时单请求速率为 N/A。"
+        "思考被服务隐藏时，客户端无法完整观测生成过程。",
+        "分布只包含成功且指标可计算的请求；P50/P95 使用 nearest-rank。"
+        "默认单并发只有 3 个样本，尾延迟参考性有限。",
+        "达到输出上限可属于协议成功；截断、最终回答缺失和未知分别保留。"
+        "最高成功并发不代表绝对容量或模式已经验证。",
+        "关闭思考时未观测到思考内容，不等于证明思考已经关闭。",
+        "请求使用不同前缀，但不能强制关闭服务端缓存。"
+        "固定执行顺序、不同输出预算和服务默认参数也可能影响对照。",
+        "N/A 表示缺少计算所需的完整观测，不表示 0；原始状态和原因保存在 requests.jsonl，"
+        "分布样本数保存在 summary.json。",
+        "变化分析仅筛选相邻已完成且全部协议成功、各至少 3 个样本的组合；"
+        "TTFT/E2E P95 升高或聚合吞吐下降至少 20% 时列为关注点。"
+        "20% 是描述性筛选阈值，不是统计显著性、SLA 或容量阈值；"
+        "不同输出长度、缓存、预热及样本差异可能影响可比性。",
+    ] + [str(warning) for warning in summary["warnings"]]
+
+
 def render_report(summary):
     config = summary["config"]
     adapter = summary.get("thinking_adapter")
@@ -1657,35 +1706,11 @@ def render_report(summary):
                 lines.append(f"| {size} | {concurrency} | {values} |")
     else:
         lines += ["本次只选择一种思考模式，不生成双模式对照。", ""]
-    lines += [
-        "",
-        "## 测量口径与限制",
-        "",
-        "- TTFT 包括可识别的思考文本；TTFO 是首个可识别的最终回答。"
-        "只有思考、没有最终回答或无法区分时，TTFO 为 N/A。",
-        "- 所有耗时来自客户端单调时钟，包括连接、网络、网关、排队与处理；不是服务端纯计算时间。"
-        "预检、独立预热、生成材料、序列化与落盘不计入性能窗口。",
-        "- 各组合测量窗口为每批最早请求发起至最后请求结束的时长之和；失败耗时保留在分母。",
-        "- 单请求输出 tok/s = (服务输出 Token − 1) / 首末语义文本间隔（秒）；"
-        "TPOT 为其倒数，以 ms/Token 表示。尾部 usage 和结束标记不延长生成时间。",
-        "- 聚合输出 tok/s = 成功请求输出 Token 总数 / 组合测量窗口；"
-        "任一成功请求缺少输出 usage 或存在未决请求时为 N/A。",
-        "- Token 仅采用服务 usage；字符数与 SSE 分块数不是 Token 数。"
-        "completion_tokens 按服务口径展示，不能直接称为最终回答 Token。",
-        "- 单块输出、少于 2 Token、零生成间隔或缺失 usage 时单请求速率为 N/A。"
-        "思考被服务隐藏时，客户端无法完整观测生成过程。",
-        "- 分布只包含成功且指标可计算的请求；P50/P95 使用 nearest-rank。"
-        "默认单并发只有 3 个样本，尾延迟参考性有限。",
-        "- 达到输出上限可属于协议成功；截断、最终回答缺失和未知分别保留。"
-        "最高成功并发不代表绝对容量或模式已经验证。",
-        "- 请求使用不同前缀，但不能强制关闭服务端缓存。"
-        "固定执行顺序、不同输出预算和服务默认参数也可能影响对照。",
-        "- N/A 表示缺少计算所需的完整观测，不表示 0；原始状态和原因保存在 requests.jsonl，"
-        "分布样本数保存在 summary.json。",
-    ]
-    lines += ["- " + md(warning) for warning in summary["warnings"]]
+    lines += ["", "## 性能变化分析", ""] + performance_observations(summary)
     if summary["config"]["self_review"]:
         lines += render_self_review(summary.get("self_review", {"status": "not_run"}))
+    lines += ["", "## 测量口径与附录", ""]
+    lines += ["- " + md(note) for note in measurement_notes(summary)]
     lines += [
         "",
         "---",
@@ -1697,18 +1722,582 @@ def render_report(summary):
     return "\n".join(lines) + "\n"
 
 
+def performance_observations(summary):
+    """Descriptive adjacent-point screening, never a significance test or capacity estimate."""
+    observations = []
+    for mode in summary["config"]["thinking_modes"]:
+        rows = [row for row in summary["cells"] if row["mode"] == mode]
+        for axis, fixed, unit in (
+            ("input_characters", "concurrency", "字符"),
+            ("concurrency", "input_characters", "并发"),
+        ):
+            for level in sorted({row[fixed] for row in rows}):
+                group = sorted((row for row in rows if row[fixed] == level), key=lambda r: r[axis])
+                for index in range(1, len(group)):
+                    before, current = group[index - 1 : index + 1]
+                    if any(
+                        row["status"] != "completed"
+                        or row["metrics"]["success_rate"] != 1
+                        or row["metrics"]["success_count"] < 3
+                        for row in (before, current)
+                    ):
+                        continue
+                    for metric, label, metric_unit, direction in (
+                        ("ttft", "TTFT P95", "ms", 1),
+                        ("e2e", "E2E P95", "ms", 1),
+                        ("aggregate_output_tps", "聚合输出吞吐", "tok/s", -1),
+                    ):
+
+                        def value(row, metric=metric):
+                            m = row["metrics"]
+                            if (
+                                row["status"] != "completed"
+                                or m["success_rate"] != 1
+                                or m["success_count"] < 3
+                                or (
+                                    metric != "aggregate_output_tps"
+                                    and m["latency_ms"][metric]["count"] < 3
+                                )
+                            ):
+                                return None
+                            return (
+                                m[metric]
+                                if metric == "aggregate_output_tps"
+                                else m["latency_ms"][metric]["p95"]
+                            )
+
+                        a, b = value(before), value(current)
+                        if a is None or b is None or a <= 0:
+                            continue
+                        change = (b / a - 1) * direction
+                        if change < 0.2 - 1e-12:
+                            continue
+                        condition = (
+                            f"并发 {level}" if fixed == "concurrency" else f"输入 {level} 字符"
+                        )
+                        trend = "升高" if direction == 1 else "下降"
+                        text = (
+                            f"{MODE_LABELS[mode]}、{condition}、"
+                            f"输出预算 {current['max_tokens']} Token："
+                            f"从 {before[axis]} 到 {current[axis]} {unit}，{label} 从 {fmt(a)} 到 "
+                            f"{fmt(b)} {metric_unit}，{trend} {change * 100:.1f}%。"
+                        )
+                        following = group[index + 1] if index + 1 < len(group) else None
+                        c = value(following) if following else None
+                        if following and following["status"] == "completed" and c is not None:
+                            recovered = (c - a) * direction <= 0
+                            text += f"下一档 {following[axis]} {unit} 为 {fmt(c)} {metric_unit}；"
+                            text += (
+                                "已恢复至前档水平，属于局部劣化。"
+                                if recovered
+                                else "仍差于前档，需复测确认是否持续劣化。"
+                            )
+                        else:
+                            text += "缺少完整的下一档观测，不能判定持续转折。"
+                        ma, mb = before["metrics"], current["metrics"]
+                        text += (
+                            f"两档成功样本数 {ma['success_count']}/{mb['success_count']}，"
+                            f"截断 {ma['truncated_count']}/{mb['truncated_count']}，"
+                            f"实际输出 Token P50 {fmt(ma['tokens']['completion_tokens']['p50'])}/"
+                            f"{fmt(mb['tokens']['completion_tokens']['p50'])}。"
+                            + (
+                                "首响应或完成等待增加。"
+                                if direction == 1
+                                else "该批次窗口内的输出吞吐降低。"
+                            )
+                            + "实际输出长度、缓存与预热可能影响可比性；建议固定条件重复相邻档位，"
+                            "不能仅据此归因硬件瓶颈或容量上限。"
+                        )
+                        observations.append(text)
+    return observations or [
+        "本次未筛出满足条件的明显劣化关注点；这不表示不存在性能退化。"
+        "失败、未完成、样本不足或缺失指标的组合仍需结合明细检查。"
+    ]
+
+
+def html_table(headers, rows):
+    """All cells are plain text; model/service content can never become executable markup."""
+
+    def escape(value):
+        return html.escape(str(value), quote=True)
+
+    return (
+        "<table><thead><tr>"
+        + "".join('<th scope="col">' + escape(value) + "</th>" for value in headers)
+        + "</tr></thead><tbody>"
+        + "".join(
+            "<tr>" + "".join("<td>" + escape(value) + "</td>" for value in row) + "</tr>"
+            for row in rows
+        )
+        + "</tbody></table>"
+    )
+
+
+def render_html_report(summary):
+    """Offline A4 report built directly from the same structured summary as Markdown."""
+
+    def esc(value):
+        return html.escape(str(value), quote=True)
+
+    def paragraph(value):
+        return "<p>" + esc(value) + "</p>"
+
+    config = summary["config"]
+    cells = summary["cells"]
+
+    def pair(dist):
+        return fmt(dist["p50"]) + " / " + fmt(dist["p95"])
+
+    parts = [
+        "<header><b>InferPulse <span>Bench</span></b></header>",
+        "<h1>大模型性能测试报告</h1>",
+        paragraph(config["model"]["name"] + " · " + summary["created_at"]),
+        '<div class="summary">',
+        "<div><strong>"
+        + str(sum(row["status"] == "completed" for row in cells))
+        + " / "
+        + str(summary["planned_cells"])
+        + "</strong>已完成测试组合</div>",
+        "<div><strong>"
+        + str(sum(row["metrics"]["success_count"] for row in cells))
+        + " / "
+        + str(summary["planned_performance_requests"])
+        + "</strong>性能请求协议完成</div>",
+        "<div><strong>"
+        + str(sum(row["metrics"]["unresolved_count"] for row in cells))
+        + "</strong>未决性能请求</div></div>",
+        "<h2>测试条件与模式验证</h2>",
+    ]
+    adapter = summary.get("thinking_adapter")
+    parts.append(
+        html_table(
+            ["测试条件", "配置与记录"],
+            [
+                ["服务", config["model"]["api_url"]],
+                ["Run", summary["run_id"]],
+                ["执行状态", summary["status"]],
+                ["输入字符档位", " / ".join(map(str, config["input_characters"]))],
+                [
+                    "并发 / 每组合轮数",
+                    " / ".join(map(str, config["concurrency"])) + f"；{config['repetitions']} 轮",
+                ],
+                [
+                    "输出预算",
+                    "；".join(
+                        f"{MODE_LABELS[mode]} {config['output_tokens'][mode]} Token"
+                        for mode in config["thinking_modes"]
+                    ),
+                ],
+                ["执行顺序", " → ".join(MODE_LABELS[mode] for mode in config["thinking_modes"])],
+                ["超时（秒）", json.dumps(config["timeouts"], ensure_ascii=False)],
+                ["输入生成器 / 种子", "synthetic/v1 / " + str(config["seed"])],
+                [
+                    "思考参数方案",
+                    (adapter["resolved"] + "；来源：" + adapter["source"])
+                    if adapter
+                    else "历史快照未记录；实际字段见各模式参数",
+                ],
+            ],
+        )
+    )
+    for mode in config["thinking_modes"]:
+        state = summary["modes"][mode]
+        observation = {
+            "observed": "已观测到思考内容或服务返回的思考 Token",
+            "not_observed": "未观测到思考",
+            "unconfirmed": "请求开启，实际模式未确认",
+            "contradicted": "关闭思考却观测到思考，模式行为矛盾",
+        }[state["observation"]]
+        parts += [
+            "<h3>" + MODE_LABELS[mode] + "</h3>",
+            paragraph(
+                "预检成功："
+                + {True: "是", False: "否", None: "未执行"}[state["preflight_success"]]
+                + "；HTTP 接受参数："
+                + {True: "是", False: "否", None: "未确认"}[state["parameters_accepted"]]
+                + f"；{observation}。"
+            ),
+            paragraph("模式参数：" + json.dumps(state["parameters"], ensure_ascii=False)),
+            paragraph(
+                "停止/结束原因："
+                + str(state["stop_reason"] or "未完成")
+                + "；预检 HTTP / 错误："
+                + str((state["preflight"] or {}).get("http_status"))
+                + " / "
+                + str((state["preflight"] or {}).get("error") or "无/未执行")
+            ),
+        ]
+    warmup = summary["warmup"]
+    parts.append("<h3>独立预热</h3>")
+    if warmup["enabled"]:
+        m = warmup["metrics"]
+        parts.append(
+            paragraph(
+                f"每模式、每字符档串行 {warmup['requests_per_length']} 次，"
+                "沿用对应输出预算，不计入性能统计。"
+                f"计划 {warmup['planned_requests']} 次，发起 {m['attempted_count']} 次，"
+                f"成功 {m['success_count']} 次；"
+                f"失败 {m['failed_count']} 次，未决 {m['unresolved_count']} 次，"
+                f"未调度 {warmup['not_run_count']} 次；"
+                f"总耗时 {fmt(m['duration_seconds'])} 秒。"
+            )
+        )
+        for group in warmup["groups"]:
+            m = group["metrics"]
+            parts.append(
+                html_table(
+                    [
+                        "模式 / 字符 / 预算 Token",
+                        "状态",
+                        "计划 / 发起 / 成功",
+                        "失败 / 取消 / 未决 / 未调度",
+                        "耗时 s",
+                        "输入 / 输出 Token P50",
+                    ],
+                    [
+                        [
+                            f"{MODE_LABELS[group['mode']]} / "
+                            f"{group['input_characters']} / {group['max_tokens']}",
+                            group["status"],
+                            f"{group['repetitions']}/{m['attempted_count']}/{m['success_count']}",
+                            f"{m['failed_count']}/{m['status_counts'].get('cancelled', 0)}/"
+                            f"{m['unresolved_count']}/{group['not_run_count']}",
+                            fmt(m["duration_seconds"]),
+                            fmt(m["tokens"]["prompt_tokens"]["p50"])
+                            + "/"
+                            + fmt(m["tokens"]["completion_tokens"]["p50"]),
+                        ]
+                    ],
+                )
+            )
+            if group["reason"] or m["error_counts"]:
+                parts.append(
+                    paragraph(
+                        "预热原因："
+                        + str(group["reason"] or "")
+                        + "；错误："
+                        + json.dumps(m["error_counts"], ensure_ascii=False)
+                        + "；HTTP："
+                        + json.dumps(m["http_status_counts"])
+                    )
+                )
+    else:
+        parts.append(paragraph("本次未启用独立预热。"))
+    if len(config["thinking_modes"]) == 2:
+        parts += [
+            "<h2>双模式对照</h2>",
+            paragraph(
+                "相同输入与并发并排展示。两种模式的预算、实际输出长度、模式验证及固定执行顺序均需一起解释。"
+            ),
+        ]
+        lookup = {
+            (row["mode"], row["input_characters"], row["concurrency"]): row["metrics"]
+            for row in cells
+        }
+        labels = {
+            "ttft": "TTFT ms",
+            "ttfo": "TTFO ms",
+            "output_tps": "输出速率 tok/s",
+            "completion_tokens": "输出 Token",
+        }
+        for label, keys in [
+            ("延迟 · P50 ms", ("ttft", "ttfo")),
+            ("输出 · P50", ("output_tps", "completion_tokens")),
+        ]:
+            data = []
+            for size in config["input_characters"]:
+                for concurrency in config["concurrency"]:
+                    modes = [lookup[(mode, size, concurrency)] for mode in MODES]
+                    values = []
+                    for key in keys:
+                        for m in modes:
+                            dist = (
+                                m["latency_ms"][key]
+                                if key in ("ttft", "ttfo")
+                                else m["tokens"][key]
+                                if key == "completion_tokens"
+                                else m[key]
+                            )
+                            values.append(fmt(dist["p50"]))
+                    data.append([size, concurrency] + values)
+            parts += [
+                "<h3>" + label + "</h3>",
+                html_table(
+                    ["字符", "并发"]
+                    + [MODE_LABELS[mode] + " " + labels[key] for key in keys for mode in MODES],
+                    data,
+                ),
+            ]
+    for mode in config["thinking_modes"]:
+        rows = [row for row in cells if row["mode"] == mode]
+        parts += [
+            "<h2>" + MODE_LABELS[mode] + " · 性能明细</h2>",
+            paragraph("延迟单位 ms，速率 tok/s，TPOT ms/Token；分位数依次为 P50 / P95。"),
+        ]
+        parts.append(
+            html_table(
+                ["字符", "并发", "状态", "发起 / 成功 / 未决", "成功率", "TTFT", "TTFO", "E2E"],
+                [
+                    [
+                        r["input_characters"],
+                        r["concurrency"],
+                        r["status"],
+                        f"{r['metrics']['attempted_count']}/{r['metrics']['success_count']}/{r['metrics']['unresolved_count']}",
+                        fmt(r["metrics"]["success_rate"], True),
+                    ]
+                    + [pair(r["metrics"]["latency_ms"][key]) for key in ("ttft", "ttfo", "e2e")]
+                    for r in rows
+                ],
+            )
+        )
+        parts.append("<h3>输出速率与服务端 Token</h3>")
+        parts.append(
+            html_table(
+                [
+                    "字符",
+                    "并发",
+                    "单请求速率",
+                    "TPOT",
+                    "聚合吞吐",
+                    "输入 Token P50",
+                    "输出 Token P50",
+                ],
+                [
+                    [
+                        r["input_characters"],
+                        r["concurrency"],
+                        pair(r["metrics"]["output_tps"]),
+                        pair(r["metrics"]["tpot_ms"]),
+                        fmt(r["metrics"]["aggregate_output_tps"]),
+                    ]
+                    + [
+                        fmt(r["metrics"]["tokens"][key]["p50"])
+                        for key in ("prompt_tokens", "completion_tokens")
+                    ]
+                    for r in rows
+                ],
+            )
+        )
+        parts.append("<h3>证据完整性</h3>")
+        parts.append(
+            html_table(
+                [
+                    "字符",
+                    "并发",
+                    "思考 / 缓存 Token P50",
+                    "usage 覆盖",
+                    "最终回答 / 未知",
+                    "截断",
+                    "速率有效样本",
+                ],
+                [
+                    [
+                        r["input_characters"],
+                        r["concurrency"],
+                        "/".join(
+                            fmt(r["metrics"]["tokens"][key]["p50"])
+                            for key in ("reasoning_tokens", "cached_tokens")
+                        ),
+                        fmt(r["metrics"]["usage_coverage"], True),
+                        f"{r['metrics']['final_answer_count']}/{r['metrics']['unknown_answer_count']}",
+                        r["metrics"]["truncated_count"],
+                        r["metrics"]["output_tps"]["count"],
+                    ]
+                    for r in rows
+                ],
+            )
+        )
+        for row in rows:
+            m = row["metrics"]
+            if row["reason"] or m["error_counts"]:
+                parts.append(
+                    paragraph(
+                        f"{row['input_characters']} 字符 / 并发 {row['concurrency']}："
+                        + str(row["reason"] or "")
+                        + "；错误："
+                        + json.dumps(m["error_counts"], ensure_ascii=False)
+                        + "；HTTP："
+                        + json.dumps(m["http_status_counts"])
+                    )
+                )
+        levels = []
+        for size in config["input_characters"]:
+            successes = [
+                r["concurrency"]
+                for r in rows
+                if r["input_characters"] == size
+                and r["status"] == "completed"
+                and r["metrics"]["success_count"] == r["concurrency"] * r["repetitions"]
+            ]
+            levels.append(f"{size} 字符：{max(successes) if successes else '无'}")
+        parts.append(paragraph("最高全部请求协议成功的已测并发：" + "；".join(levels) + "。"))
+    parts += ["<h2>性能变化分析</h2>"] + [
+        paragraph(value) for value in performance_observations(summary)
+    ]
+    if config["self_review"]:
+        # Reuse status/rating wording; model prose remains escaped plain text.
+        lines = render_self_review(summary.get("self_review", {"status": "not_run"}))
+        parts.append("<h2>模型自评</h2>")
+        fence = None
+        body = []
+        for line in lines:
+            if fence is not None:
+                if line == fence:
+                    parts.append('<div class="review">' + esc("\n".join(body)) + "</div>")
+                    fence = None
+                else:
+                    body.append(line)
+            elif re.fullmatch(r"`{3,}text", line):
+                fence = line[:-4]
+            elif line and not line.startswith("## "):
+                parts.append(paragraph(line.replace("**", "")))
+    parts += ["<h2>测量口径与附录</h2>"] + [paragraph(note) for note in measurement_notes(summary)]
+    parts.append(
+        '<footer>如果 InferPulse Bench 帮到了你，欢迎<a href="'
+        + SUPPORT_URL
+        + '">打开支持页面</a>，请作者喝一杯瑞幸咖啡。支持全凭自愿，不影响任何功能的使用。</footer>'
+    )
+    style = """
+@page { size: A4 portrait;
+margin: 15mm;
+}
+* { box-sizing: border-box;
+}
+body { margin: 0;
+color: #284960;
+background: #edf2f7;
+font: 10pt/1.65 Arial,"PingFang SC","Microsoft YaHei",sans-serif;
+}
+main { width: 210mm;
+max-width: 100%;
+padding: 15mm;
+margin: 24px auto;
+background: white;
+}
+header { border-bottom: 1px solid #cddde9;
+padding-bottom: 12px;
+color: #2d6089;
+}
+header span { font-weight: normal;
+}
+h1 { font-size: 23pt;
+line-height: 1.3;
+margin: 22px 0 8px;
+}
+h2 { font-size: 15pt;
+color: #2b73a8;
+border-bottom: 1px solid #dce6ee;
+margin: 28px 0 12px;
+padding-bottom: 6px;
+}
+h3 { font-size: 11pt;
+margin: 18px 0 8px;
+}
+h1,h2,h3 { break-after: avoid;
+}
+p { margin: 8px 0;
+overflow-wrap: anywhere;
+orphans: 3;
+widows: 3;
+}
+.summary { display: flex;
+background: #edf7ff;
+border: 1px solid #d0e3f3;
+border-radius: 4px;
+margin: 24px 0;
+padding: 14px 0;
+break-inside: avoid;
+}
+.summary div { flex: 1;
+text-align: center;
+font-size: 9pt;
+border-right: 1px solid #d0e3f3;
+}
+.summary div:last-child { border: 0;
+}
+.summary strong { display: block;
+font-size: 21pt;
+color: #2e80b6;
+}
+table { border-collapse: collapse;
+table-layout: fixed;
+width: 100%;
+font-size: 8.5pt;
+margin: 12px 0 20px;
+}
+thead { display: table-header-group;
+}
+th,td { padding: 7px 5px;
+border-bottom: 1px solid #dce6ee;
+text-align: left;
+vertical-align: top;
+overflow-wrap: anywhere;
+}
+th { background: #edf6fc;
+color: #2d6089;
+font-weight: 600;
+}
+tr { break-inside: avoid;
+}
+.review { white-space: pre-wrap;
+overflow-wrap: anywhere;
+line-height: 1.8;
+orphans: 3;
+widows: 3;
+}
+footer { margin-top: 24px;
+padding-top: 12px;
+border-top: 1px solid #dce6ee;
+font-size: 9pt;
+}
+a { color: #2b73a8;
+}
+@media print { body { background: white;
+} main { width: auto;
+max-width: none;
+margin: 0;
+padding: 0;
+} h2 { break-before: page;
+} .summary + h2 { break-before: auto;
+} }
+@media screen and (max-width: 700px) { main { padding: 5vw;
+margin: 0;
+} table { font-size: 8pt;
+} }
+"""
+    return (
+        '<!doctype html>\n<html lang="zh-CN"><head><meta charset="utf-8">'
+        '<meta name="viewport" content="width=device-width,initial-scale=1">'
+        '<meta http-equiv="Content-Security-Policy" '
+        "content=\"default-src 'none'; style-src 'unsafe-inline'; "
+        "base-uri 'none'; form-action 'none'\">"
+        "<title>"
+        + esc(config["model"]["name"])
+        + " · 性能测试报告</title><style>"
+        + style
+        + "</style></head><body><main>"
+        + "\n".join(parts)
+        + "</main></body></html>\n"
+    )
+
+
 def generate_report(directory):
     snapshot, records, warnings = load_evidence(directory)
     try:
         summary = summarize(snapshot, records, warnings)
         summary["self_review"] = read_self_review(directory, summary)
-        report = render_report(summary)
+        reports = {
+            format_: (render_report(summary) if format_ == "md" else render_html_report(summary))
+            for format_ in summary["config"]["report_formats"]
+        }
     except (KeyError, TypeError, ZeroDivisionError):
         raise BenchmarkError("证据字段不完整或类型错误，无法安全汇总") from None
     atomic_json(directory / "summary.json", summary)
-    atomic_text(directory / "report.md", report)
-    if snapshot.get("report_file"):
-        atomic_text(directory.parent / snapshot["report_file"], report)
+    for format_, report in reports.items():
+        atomic_text(directory / ("report." + format_), report)
+        if snapshot.get("report_file"):
+            target = Path(snapshot["report_file"]).with_suffix("." + format_)
+            atomic_text(directory.parent / target, report)
     return summary
 
 
@@ -1906,7 +2495,11 @@ def main(argv=None):
     try:
         if args.command == "report":
             summary = generate_report(args.input)
-            print("报告已生成：{}；状态：{}".format(args.input / "report.md", summary["status"]))
+            paths = "、".join(
+                str(args.input / ("report." + format_))
+                for format_ in summary["config"]["report_formats"]
+            )
+            print("报告已生成：{}；状态：{}".format(paths, summary["status"]))
             return 0
         config_path = args.config or default_config_path(script_directory)
         if not config_path.exists() and args.config is None and not args.dry_run:
@@ -1926,6 +2519,7 @@ def main(argv=None):
                         "input_characters": config["input_characters"],
                         "concurrency": config["concurrency"],
                         "thinking_modes": config["thinking_modes"],
+                        "report_formats": config["report_formats"],
                         "repetitions": config["repetitions"],
                         "timeouts": config["timeouts"],
                         "cells": len(cells),
@@ -1962,7 +2556,11 @@ def main(argv=None):
         output = args.output or script_directory / f"llm_benchmark_evidence_{stamp}"
         report_file = f"llm_benchmark_report_{stamp}.md"
         summary = run_benchmark(config, output, credential, report_file=report_file)
-        print(f"报告：{output.parent / report_file}；状态：{summary['status']}", flush=True)
+        paths = "、".join(
+            str((output.parent / report_file).with_suffix("." + format_))
+            for format_ in config["report_formats"]
+        )
+        print(f"报告：{paths}；状态：{summary['status']}", flush=True)
         review_reason = summary.get("self_review", {}).get("reason")
         if review_reason == "cancelled":
             return 130
