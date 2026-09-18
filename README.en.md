@@ -6,7 +6,7 @@ A standalone Python benchmark for locally deployed LLM services. Configure one m
 
 **Source version 1.8.0 · Python 3.9+ · Standard library only · MIT**
 
-[Download](https://gitee.com/xum1983/inferpulse-bench/releases/tag/v1.8.0) · [Sample report (mock service)](report.example.md) · [Contributing](CONTRIBUTING.md) · [☕ Support the author](SPONSOR.md)
+[Download](https://gitee.com/xum1983/inferpulse-bench/releases/tag/v1.8.0) · [Markdown sample report](report.example.md) · [HTML report](report.example.html) · [PDF report](report.example.pdf) · [Contributing](CONTRIBUTING.md) · [☕ Support the author](SPONSOR.md)
 
 CLI messages, generated reports and optional model self-review are currently in **Chinese**. This README provides English instructions; it does not enable an English output mode.
 
@@ -151,6 +151,16 @@ Failure time stays in the aggregate-throughput denominator. If any successful re
 Protocol success and final-answer presence are separate. A reasoning-only, budget-exhausted response can complete the protocol with no final answer and `TTFO=N/A`. Truncation and unknown answer status are retained. `N/A` means unavailable, not zero.
 
 The default budgets differ: **512 off / 4096 on**. Compare actual output lengths, mode observations, execution order and sample counts. The default single-concurrency point has only three samples; its P95 has limited value. The highest successful tested concurrency is not absolute capacity. Bench does not measure answer accuracy or collect GPU/CPU telemetry, and cannot identify a hardware bottleneck from latency alone.
+
+## HTML / PDF report preview
+
+[Download HTML](report.example.html) · [View PDF](report.example.pdf)
+
+Download the HTML file and open it directly in a browser, with no network access or dependencies. The 12-page report uses a light layout with all content expanded, paired thinking-mode comparisons, performance-change analysis, model self-review and a final appendix. Print in A4 portrait at 100% scale with browser headers and footers disabled.
+
+![Report cover](report.preview.png)
+
+These files use synthetic data and authored self-review text to evaluate the report layout; they are not measurements of a real model. HTML generation and format configuration are not integrated into 1.8.0: the CLI still generates Markdown. This update does not change the program version or release package.
 
 ## Reports and evidence
 
