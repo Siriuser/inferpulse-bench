@@ -1,0 +1,490 @@
+<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light"><title>InferPulse Bench · 性能测试报告</title><style>
+:root{font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;color:#243c52;background:#edf2f7;font-synthesis:none;font-size:10pt;line-height:1.65;font-variant-numeric:tabular-nums}*{box-sizing:border-box}body{margin:0}a{color:#2673ac}p{margin:2.2mm 0}b{font-weight:650}button{font:inherit;background:#287bb5;color:white;border:0;border-radius:5px;padding:8px 18px;cursor:pointer}button:focus-visible,a:focus-visible{outline:3px solid #d18523;outline-offset:3px}.toolbar{position:sticky;top:0;z-index:3;display:flex;align-items:center;justify-content:space-between;gap:16px;max-width:210mm;margin:0 auto;padding:12px 0;background:#edf2f7}.toolbar p{font-size:9pt;margin:0}.toolbar small{display:block;color:#5a7085}.sheet{width:210mm;min-height:297mm;padding:15mm;margin:0 auto 8mm;background:white;display:flex;flex-direction:column;break-after:page;page-break-after:always}.sheet:last-child{break-after:auto;page-break-after:auto}.masthead{display:flex;justify-content:space-between;align-items:center;padding-bottom:3mm;border-bottom:.3mm solid #b8cee0;font-size:8pt;margin-bottom:6mm}.brand{font-weight:750;color:#254e72;font-size:12pt}.brand span{font-weight:400}h1{font-size:23pt;line-height:1.25;letter-spacing:-.4px;margin:0 0 2mm;color:#173b59}h2{font-size:13pt;line-height:1.45;margin:5mm 0 2.5mm;color:#203e59}h2>span{color:#2b76ab;margin-right:2mm}h3{font-size:10pt;margin:0 0 1.7mm;color:#285c85}small,.muted{color:#62798e}.subtitle{font-size:10pt;color:#677f93;margin:0 0 4.5mm}.lead{font-size:9pt;margin:0 0 3mm;color:#61778a}.note{font-size:8.8pt;background:#f2f7fb;border-left:.6mm solid #95bbd7;padding:2.5mm 3mm;margin:3mm 0;break-inside:avoid}.note.warm{background:#fff8ee;border-color:#d6b179}.summary{display:grid;grid-template-columns:1fr 1.5fr .8fr;background:#edf6fd;border-radius:4px;padding:4mm 1mm;margin:3mm 0}.summary>div{text-align:center;border-right:1px solid #cddfea}.summary>div:last-child{border:0}.summary strong{font-size:25pt;color:#2877af;line-height:1.25;display:block}.summary strong span{font-size:17pt;font-weight:450}.summary>div>span{font-size:8.6pt;color:#52728b}.two{display:grid;grid-template-columns:1fr 1fr;gap:5mm;break-inside:avoid}.config{margin:0;font-size:9pt}.config>div{display:grid;grid-template-columns:29mm 1fr;padding:1.7mm 0;border-bottom:1px solid #e6edf3}.config dt{color:#667b8e}.config dd{margin:0}.mode-facts{margin-top:3mm}.mode-facts>section{padding:3mm;border:1px solid #d8e4ed;border-radius:3px;font-size:9pt}.mode-card{border:1px solid #d1e1ee;border-radius:4px;overflow-wrap:anywhere}.mode-card h3{background:#edf6fd;padding:2.5mm 3mm;margin:0}.mode-card.on h3{background:#f0f4f7}.mode-card h3 small{font-size:8pt;font-weight:400;display:block}.mode-card dl{margin:0;padding:0 3mm}.mode-card dl>div{padding:2mm 0;border-bottom:1px solid #e5edf4;display:flex;justify-content:space-between;align-items:center;gap:2mm}.mode-card dl>div:last-child{border:0}.mode-card dt{font-size:8pt}.mode-card dd{margin:0;font-size:13pt;color:#1e5e8e}.mode-card dd em{font-size:8pt;font-style:normal}.contents{font-size:9pt;margin:4mm 0 0;padding-top:3mm;border-top:1px solid #dce7ef}.contents p{color:#5d768b}.footer{margin-top:auto;padding-top:4mm;display:flex;justify-content:space-between;gap:4mm;border-bottom:0;font-size:7.5pt;color:#61798e}.footer>span{border-top:1px solid #cbdce9;padding-top:2mm;flex:1}.footer>span:last-child{text-align:right;flex:0 0 21mm}table{width:100%;border-collapse:collapse;table-layout:fixed;font-size:8.5pt;line-height:1.4;margin:3mm 0;color:#2c455a}th{background:#edf4fa;font-size:8pt;color:#355c7b;font-weight:650;text-align:right;border-bottom:1px solid #b9cede;padding:2.2mm 1.5mm}td{padding:2.1mm 1.5mm;text-align:right;border-bottom:1px solid #e1eaf1;overflow-wrap:anywhere}th:first-child,td:first-child{text-align:left}thead{display:table-header-group}tr{break-inside:avoid;page-break-inside:avoid}tr.group-start td{border-top:1px solid #b9cede}tbody tr:nth-child(6n+1),tbody tr:nth-child(6n+2),tbody tr:nth-child(6n+3){background:#fbfdff}.double-line td{padding:1.2mm 1.3mm;font-size:8.1pt;line-height:1.3}.double-line th{padding:1.8mm 1.1mm}.double-line th:nth-child(3){width:31mm}.compact th:nth-child(3){width:23mm}.compact td{font-size:7.7pt}.compact th{font-size:7.4pt}.evidence-table td{font-size:8pt}.evidence-table th:nth-child(4){width:31mm}.envelope{font-size:8pt}.explanations{margin-top:5mm;font-size:9pt}.methods{font-size:8.5pt;line-height:1.5;margin:0;padding-left:5mm}.methods li{margin:0 0 1.8mm;break-inside:avoid}.source{font-size:7.8pt;overflow-wrap:anywhere}.support{font-size:8pt;border-top:1px solid #dbe6ee;padding-top:2mm;margin-top:3mm}.support p{margin:1mm 0}.support a{font-size:7.7pt;word-break:break-all}code{font-size:8pt;overflow-wrap:anywhere}figure{margin:3mm 0 2mm;break-inside:avoid}figcaption{font-size:9pt;color:#345e7e;font-weight:600}figcaption span{float:right;color:#6a7e91;font-size:7.5pt;font-weight:400}figure svg{display:block;width:100%;height:auto}h1,h2,h3{break-after:avoid} .sheet:last-child .two{font-size:8.5pt;margin-top:3mm}
+/* Keep complete metric pairs on one line and reserve explicit column widths. */
+td{padding:1.15mm 1.5mm}h2{margin-top:3.5mm}.masthead{margin-bottom:4mm}.mode-card dl>div{padding:1.2mm 0}.contents{margin-top:2mm;padding-top:2mm;font-size:8pt}.summary{padding:3mm 1mm}.double-line td{padding:.8mm 1mm;font-size:8.5pt;line-height:1.4;white-space:nowrap}.double-line th{font-size:8pt}.double-line th:first-child{width:19mm}.double-line th:nth-child(2){width:8mm}.double-line:not(.compact) th:nth-child(4){width:17mm}.compact th:first-child{width:18mm}.compact th:nth-child(2){width:8mm}.compact th:nth-child(3){width:31mm}.compact th:nth-child(4){width:24mm}.compact th:nth-child(5){width:21mm}.compact td{font-size:8pt}.compact th{font-size:7.8pt}.footer{padding-top:3mm}
+.review-rating{display:flex;align-items:center;justify-content:space-between;gap:5mm;background:#edf6fd;border:1px solid #d1e3f0;border-radius:4px;padding:3mm 5mm;margin:2mm 0 3mm}.review-eyebrow{display:block;color:#52728b;font-size:9pt}.review-rating strong{display:block;font-size:31pt;line-height:1.5;color:#226b9f;letter-spacing:2px}.review-rating p{font-size:10pt;color:#345e7e;text-align:right}.review-rating p span{font-size:8pt;color:#61778a}.review-body h2{font-size:11pt;margin:3mm 0 1.5mm}.review-body p{font-size:9.5pt;line-height:1.7;margin:0}.review-body section{break-inside:avoid}.review-meta{font-size:8pt;border-top:1px solid #dbe6ee;margin-top:4mm;padding-top:3mm;color:#587084}.review-meta p{margin:1mm 0}
+.finding{background:#fff8ee;border-left:3px solid #bd8031;padding:2mm 4mm}.finding-label{font-size:8pt;color:#865415}.finding h2{margin:1mm 0 2mm;font-size:16pt}.finding p{font-size:9pt;margin:0}.turn-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:4mm;margin:2mm 0}.turn-stats section{padding:2mm 3mm;background:#f2f7fb}.turn-stats span,.turn-stats small{display:block;font-size:8pt}.turn-stats strong{font-size:23pt;color:#965e1c;line-height:1.4}.turn-table tbody tr:nth-child(2){background:#fff3de}.turn-table tbody tr:nth-child(2) td{font-weight:650}
+@page{size:A4 portrait;margin:15mm}
+@media print{:root{background:white}body{margin:0}.toolbar{display:none!important}.sheet{width:180mm;min-height:266mm;padding:0;margin:0;box-shadow:none}.summary{border:1px solid #d1e3f0}*{-webkit-print-color-adjust:exact;print-color-adjust:exact}a{text-decoration:none}}
+@media screen and (max-width:820px){.toolbar{padding:10px 12px}.sheet{width:100%;min-height:0;padding:24px 20px;margin-bottom:16px}.footer{margin-top:18px}.toolbar small{max-width:230px}}
+@media screen and (max-width:540px){:root{font-size:9pt}.two{grid-template-columns:1fr}.summary strong{font-size:20pt}.masthead{gap:12px}.brand{font-size:10pt}.config>div{grid-template-columns:25mm 1fr}h1{font-size:20pt}th,td{padding:6px 3px!important;font-size:7pt!important}.double-line th:nth-child(3){width:auto}.compact th:nth-child(3){width:auto}.evidence-table th:nth-child(4){width:auto}figcaption span{float:none;display:block}}
+</style></head><body><div class="toolbar"><p><b>性能测试报告</b><small>纵向 · 比例 100% · 关闭浏览器页眉页脚</small></p><button type="button" onclick="window.print()">打印 / 保存 PDF</button></div><main><article class="sheet" aria-label="第 1 页：大模型性能测试报告"><header class="masthead"><div class="brand">InferPulse <span>Bench</span></div></header><h1>大模型性能测试报告</h1><p class="subtitle">Qwen3.8-27B · 2026-09-09</p><div class="page-content">
+  <div class="summary"><div><strong>42 <span>/ 42</span></strong><span>已完成测试组合</span></div><div><strong>672 <span>/ 672</span></strong><span>性能请求协议完成</span></div><div><strong>0</strong><span>未决性能请求</span></div></div>
+  <h2><span>01</span> 测试条件与模式验证</h2>
+  <dl class="config"><div><dt>输入字符档位</dt><dd>1,024 / 2,048 / 4,096 / 8,192 / 16,384 / 32,768 / 65,536</dd></div><div><dt>执行计划</dt><dd>并发 1 / 5 / 10，每组合 3 轮；先关闭思考，再开启思考</dd></div><div><dt>预检与预热</dt><dd>2 次独立模式预检；本次未启用独立预热</dd></div></dl>
+  <div class="two mode-facts"><section><h3>关闭思考</h3><p>HTTP 接受参数：是；预检成功。</p></section><section><h3>开启思考</h3><p>HTTP 接受参数：是；预检成功。</p><p>已观测到思考内容或服务返回的思考 Token。</p></section></div>
+  <h2><span>02</span> 双模式对照 · 关键场景</h2>
+  <p class="lead">相同输入 1,024 字符 · 并发 1 · 每模式 3 个样本。全量对照见第 2–3 页。</p>
+  <div class="two compare"><section class="mode-card off"><h3>关闭思考<small>输出预算 512 Token</small></h3><dl><div><dt>TTFT P50</dt><dd>6.81 <em>ms</em></dd></div><div><dt>TTFO P50</dt><dd>6.81 <em>ms</em></dd></div><div><dt>单请求输出速率 P50</dt><dd>875.79 <em>tok/s</em></dd></div><div><dt>实际输出 Token P50</dt><dd>12.00</dd></div></dl></section><section class="mode-card on"><h3>开启思考<small>输出预算 4096 Token</small></h3><dl><div><dt>TTFT P50</dt><dd>6.60 <em>ms</em></dd></div><div><dt>TTFO P50</dt><dd>14.09 <em>ms</em></dd></div><div><dt>单请求输出速率 P50</dt><dd>848.47 <em>tok/s</em></dd></div><div><dt>实际输出 Token P50</dt><dd>18.00</dd></div></dl></section></div>
+  <div class="note warm">关闭 / 开启思考的输出预算分别为 <b>512 / 4,096 Token</b>。这不是等预算对照，需结合实际输出长度与模式观测一起解释。</div>
+  <div class="contents">02–03 双模式对照　04–06 关闭思考　07–09 开启思考　10 性能分析　11 模型自评　12 口径与附录</div>
+</div><footer class="footer"><span>Qwen3.8-27B · 2026-09-09</span><span>01 / 12</span></footer></article><article class="sheet" aria-label="第 2 页：双模式对照 · 延迟"><header class="masthead"><div class="brand">InferPulse <span>Bench</span></div></header><h1>双模式对照 · 延迟</h1><p class="subtitle">21 个共同组合，全部展开</p><div class="page-content">
+  <p class="lead">每行固定输入字符与并发，左右对照关闭 / 开启思考。单位：ms；统计量：P50。</p>
+  <div class="note warm">关闭思考预算 512 Token；开启思考预算 4,096 Token。不同预算、实际输出长度及固定执行顺序均可能影响结果。</div>
+  <table class="comparison-table"><thead><tr><th scope="col">输入字符</th><th scope="col">并发</th><th scope="col">关闭 TTFT</th><th scope="col">开启 TTFT</th><th scope="col">关闭 TTFO</th><th scope="col">开启 TTFO</th></tr></thead><tbody><tr class="group-start"><td>1,024</td><td>1</td><td>6.81</td><td>6.60</td><td>6.81</td><td>14.09</td></tr><tr><td>1,024</td><td>5</td><td>7.61</td><td>7.33</td><td>7.61</td><td>14.51</td></tr><tr><td>1,024</td><td>10</td><td>8.45</td><td>8.43</td><td>8.45</td><td>15.31</td></tr><tr class="group-start"><td>2,048</td><td>1</td><td>6.78</td><td>6.44</td><td>6.78</td><td>14.00</td></tr><tr><td>2,048</td><td>5</td><td>7.30</td><td>7.21</td><td>7.30</td><td>14.55</td></tr><tr><td>2,048</td><td>10</td><td>8.08</td><td>8.30</td><td>8.08</td><td>15.43</td></tr><tr class="group-start"><td>4,096</td><td>1</td><td>6.53</td><td>6.74</td><td>6.53</td><td>14.26</td></tr><tr><td>4,096</td><td>5</td><td>7.24</td><td>7.09</td><td>7.24</td><td>14.33</td></tr><tr><td>4,096</td><td>10</td><td>7.94</td><td>8.54</td><td>7.94</td><td>15.32</td></tr><tr class="group-start"><td>8,192</td><td>1</td><td>6.80</td><td>6.84</td><td>6.80</td><td>14.37</td></tr><tr><td>8,192</td><td>5</td><td>7.54</td><td>7.43</td><td>7.54</td><td>14.71</td></tr><tr><td>8,192</td><td>10</td><td>8.11</td><td>8.33</td><td>8.11</td><td>15.46</td></tr><tr class="group-start"><td>16,384</td><td>1</td><td>6.78</td><td>6.83</td><td>6.78</td><td>14.34</td></tr><tr><td>16,384</td><td>5</td><td>7.34</td><td>7.73</td><td>7.34</td><td>15.01</td></tr><tr><td>16,384</td><td>10</td><td>7.90</td><td>7.90</td><td>7.90</td><td>14.91</td></tr><tr class="group-start"><td>32,768</td><td>1</td><td>6.84</td><td>6.87</td><td>6.84</td><td>14.37</td></tr><tr><td>32,768</td><td>5</td><td>7.28</td><td>7.66</td><td>7.28</td><td>15.65</td></tr><tr><td>32,768</td><td>10</td><td>10.94</td><td>8.22</td><td>10.94</td><td>15.30</td></tr><tr class="group-start"><td>65,536</td><td>1</td><td>6.74</td><td>6.30</td><td>6.74</td><td>13.87</td></tr><tr><td>65,536</td><td>5</td><td>7.41</td><td>7.86</td><td>7.41</td><td>15.22</td></tr><tr><td>65,536</td><td>10</td><td>8.25</td><td>8.52</td><td>8.25</td><td>15.91</td></tr></tbody></table>
+  <div class="two explanations"><section><h3>TTFT：首个语义文本</h3><p>包含可识别的思考文本。不是首个 SSE 事件，也不代表服务端纯计算时间。</p></section><section><h3>TTFO：首个最终回答文本</h3><p>没有最终回答或无法区分时为 N/A。与 TTFT 的差异不能直接归因为模型计算。</p></section></div>
+  <div class="note ">本表展示各组合 P50；未对各组合分位数求平均。各模式的 P95 与 E2E 见各自明细页。</div>
+</div><footer class="footer"><span>Qwen3.8-27B · 2026-09-09</span><span>02 / 12</span></footer></article><article class="sheet" aria-label="第 3 页：双模式对照 · 输出"><header class="masthead"><div class="brand">InferPulse <span>Bench</span></div></header><h1>双模式对照 · 输出</h1><p class="subtitle">速率与实际输出长度共同阅读</p><div class="page-content">
+  <p class="lead">速率单位：tok/s；统计量：P50。实际输出 Token 仅取服务端 usage。</p>
+  <table class="comparison-table"><thead><tr><th scope="col">输入字符</th><th scope="col">并发</th><th scope="col">关闭输出速率</th><th scope="col">开启输出速率</th><th scope="col">关闭输出 Token</th><th scope="col">开启输出 Token</th></tr></thead><tbody><tr class="group-start"><td>1,024</td><td>1</td><td>875.79</td><td>848.47</td><td>12.00</td><td>18.00</td></tr><tr><td>1,024</td><td>5</td><td>877.73</td><td>848.57</td><td>12.00</td><td>18.00</td></tr><tr><td>1,024</td><td>10</td><td>872.21</td><td>889.46</td><td>12.00</td><td>18.00</td></tr><tr class="group-start"><td>2,048</td><td>1</td><td>877.47</td><td>844.99</td><td>12.00</td><td>18.00</td></tr><tr><td>2,048</td><td>5</td><td>870.60</td><td>889.55</td><td>12.00</td><td>18.00</td></tr><tr><td>2,048</td><td>10</td><td>876.37</td><td>877.69</td><td>12.00</td><td>18.00</td></tr><tr class="group-start"><td>4,096</td><td>1</td><td>878.18</td><td>846.52</td><td>12.00</td><td>18.00</td></tr><tr><td>4,096</td><td>5</td><td>868.99</td><td>880.05</td><td>12.00</td><td>18.00</td></tr><tr><td>4,096</td><td>10</td><td>872.01</td><td>892.04</td><td>12.00</td><td>18.00</td></tr><tr class="group-start"><td>8,192</td><td>1</td><td>876.50</td><td>846.82</td><td>12.00</td><td>18.00</td></tr><tr><td>8,192</td><td>5</td><td>876.05</td><td>876.16</td><td>12.00</td><td>18.00</td></tr><tr><td>8,192</td><td>10</td><td>874.91</td><td>901.28</td><td>12.00</td><td>18.00</td></tr><tr class="group-start"><td>16,384</td><td>1</td><td>874.95</td><td>848.85</td><td>12.00</td><td>18.00</td></tr><tr><td>16,384</td><td>5</td><td>878.46</td><td>870.40</td><td>12.00</td><td>18.00</td></tr><tr><td>16,384</td><td>10</td><td>880.54</td><td>890.96</td><td>12.00</td><td>18.00</td></tr><tr class="group-start"><td>32,768</td><td>1</td><td>874.87</td><td>846.24</td><td>12.00</td><td>18.00</td></tr><tr><td>32,768</td><td>5</td><td>898.23</td><td>848.57</td><td>12.00</td><td>18.00</td></tr><tr><td>32,768</td><td>10</td><td>917.64</td><td>879.30</td><td>12.00</td><td>18.00</td></tr><tr class="group-start"><td>65,536</td><td>1</td><td>877.17</td><td>847.13</td><td>12.00</td><td>18.00</td></tr><tr><td>65,536</td><td>5</td><td>877.24</td><td>847.81</td><td>12.00</td><td>18.00</td></tr><tr><td>65,536</td><td>10</td><td>888.72</td><td>890.99</td><td>12.00</td><td>18.00</td></tr></tbody></table>
+  <h2>结果解释边界</h2>
+  <p>关闭思考与开启思考的实际输出 Token P50 分别为 12 与 18，均低于配置的输出预算。本次输出较短，长输出场景的生成表现仍需单独测试。</p>
+  <p>单请求输出速率描述一次请求的生成速率；聚合输出吞吐描述组合测量窗口内的总输出，两者不能互换。各组合聚合吞吐见第 5、8 页。</p>
+  <div class="note ">completion_tokens 按服务口径展示，不能直接称为最终回答 Token。达到输出上限、最终回答缺失及未知状态应独立保留。</div>
+</div><footer class="footer"><span>Qwen3.8-27B · 2026-09-09</span><span>03 / 12</span></footer></article><article class="sheet" aria-label="第 4 页：关闭思考 · 请求与延迟"><header class="masthead"><div class="brand">InferPulse <span>Bench</span></div></header><h1>关闭思考 · 请求与延迟</h1><p class="subtitle">512 Token 输出预算 · 21 个组合</p><div class="page-content">
+    <p class="lead">TTFT / TTFO / E2E 均为客户端观测，单位 ms。每个单元格依次列出 P50 / P95。</p>
+    <table class="double-line"><thead><tr><th scope="col">输入字符</th><th scope="col">并发</th><th scope="col">发起 / 成功 / 未决</th><th scope="col">成功率</th><th scope="col">TTFT<br>P50 / P95</th><th scope="col">TTFO<br>P50 / P95</th><th scope="col">E2E<br>P50 / P95</th></tr></thead><tbody><tr class="group-start"><td>1,024</td><td>1</td><td>3/3/0</td><td>100.0%</td><td>6.81/6.88</td><td>6.81/6.88</td><td>19.47/19.52</td></tr><tr><td>1,024</td><td>5</td><td>15/15/0</td><td>100.0%</td><td>7.61/8.26</td><td>7.61/8.26</td><td>20.22/20.92</td></tr><tr><td>1,024</td><td>10</td><td>30/30/0</td><td>100.0%</td><td>8.45/9.75</td><td>8.45/9.75</td><td>21.49/22.30</td></tr><tr class="group-start"><td>2,048</td><td>1</td><td>3/3/0</td><td>100.0%</td><td>6.78/7.12</td><td>6.78/7.12</td><td>19.17/19.80</td></tr><tr><td>2,048</td><td>5</td><td>15/15/0</td><td>100.0%</td><td>7.30/7.73</td><td>7.30/7.73</td><td>20.10/20.71</td></tr><tr><td>2,048</td><td>10</td><td>30/30/0</td><td>100.0%</td><td>8.08/9.13</td><td>8.08/9.13</td><td>20.65/21.59</td></tr><tr class="group-start"><td>4,096</td><td>1</td><td>3/3/0</td><td>100.0%</td><td>6.53/6.58</td><td>6.53/6.58</td><td>19.15/19.24</td></tr><tr><td>4,096</td><td>5</td><td>15/15/0</td><td>100.0%</td><td>7.24/9.36</td><td>7.24/9.36</td><td>20.22/21.97</td></tr><tr><td>4,096</td><td>10</td><td>30/30/0</td><td>100.0%</td><td>7.94/8.61</td><td>7.94/8.61</td><td>20.67/21.83</td></tr><tr class="group-start"><td>8,192</td><td>1</td><td>3/3/0</td><td>100.0%</td><td>6.80/6.81</td><td>6.80/6.81</td><td>19.46/19.48</td></tr><tr><td>8,192</td><td>5</td><td>15/15/0</td><td>100.0%</td><td>7.54/8.73</td><td>7.54/8.73</td><td>20.17/21.65</td></tr><tr><td>8,192</td><td>10</td><td>30/30/0</td><td>100.0%</td><td>8.11/9.28</td><td>8.11/9.28</td><td>20.77/21.60</td></tr><tr class="group-start"><td>16,384</td><td>1</td><td>3/3/0</td><td>100.0%</td><td>6.78/6.87</td><td>6.78/6.87</td><td>19.52/19.95</td></tr><tr><td>16,384</td><td>5</td><td>15/15/0</td><td>100.0%</td><td>7.34/8.24</td><td>7.34/8.24</td><td>20.09/20.82</td></tr><tr><td>16,384</td><td>10</td><td>30/30/0</td><td>100.0%</td><td>7.90/8.69</td><td>7.90/8.69</td><td>20.41/20.99</td></tr><tr class="group-start"><td>32,768</td><td>1</td><td>3/3/0</td><td>100.0%</td><td>6.84/6.90</td><td>6.84/6.90</td><td>19.48/19.49</td></tr><tr><td>32,768</td><td>5</td><td>15/15/0</td><td>100.0%</td><td>7.28/8.07</td><td>7.28/8.07</td><td>19.73/21.37</td></tr><tr><td>32,768</td><td>10</td><td>30/30/0</td><td>100.0%</td><td>10.94/12.59</td><td>10.94/12.59</td><td>23.05/25.35</td></tr><tr class="group-start"><td>65,536</td><td>1</td><td>3/3/0</td><td>100.0%</td><td>6.74/6.78</td><td>6.74/6.78</td><td>19.33/19.38</td></tr><tr><td>65,536</td><td>5</td><td>15/15/0</td><td>100.0%</td><td>7.41/8.27</td><td>7.41/8.27</td><td>19.98/20.85</td></tr><tr><td>65,536</td><td>10</td><td>30/30/0</td><td>100.0%</td><td>8.25/9.74</td><td>8.25/9.74</td><td>20.59/22.10</td></tr></tbody></table>
+    <figure><figcaption>关闭思考 · TTFT P95 随输入规模变化<span>A：关注点 · 见第 10 页；横轴：字符；C：并发</span></figcaption><svg role="img" aria-label="关闭思考 · TTFT P95 随输入规模变化" width="660" height="150" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" version="1.1" baseProfile="full" viewBox="0 0 660 150">
+<rect width="660" height="150" x="0" y="0" fill="none"></rect>
+<path d="M48 116.5L644 116.5" fill="none" pointer-events="visible" stroke="#e9eff5" class="zr0-cls-0"></path>
+<path d="M48 87.5L644 87.5" fill="none" pointer-events="visible" stroke="#e9eff5" class="zr0-cls-0"></path>
+<path d="M48 58.5L644 58.5" fill="none" pointer-events="visible" stroke="#e9eff5" class="zr0-cls-0"></path>
+<path d="M48 30.5L644 30.5" fill="none" pointer-events="visible" stroke="#e9eff5" class="zr0-cls-0"></path>
+<text dominant-baseline="central" text-anchor="middle" style="font-size:10px;font-family:Arial;" y="-5" transform="translate(48 15)" fill="#415971">ms</text>
+<path d="M48 116.5L644 116.5" fill="none" pointer-events="visible" stroke="#ccd8e4" stroke-linecap="round" class="zr0-cls-0"></path>
+<text dominant-baseline="central" text-anchor="end" style="font-size:9px;font-family:Arial;" transform="translate(40 116)" fill="#54555a">0</text>
+<text dominant-baseline="central" text-anchor="end" style="font-size:9px;font-family:Arial;" transform="translate(40 87.3333)" fill="#54555a">5</text>
+<text dominant-baseline="central" text-anchor="end" style="font-size:9px;font-family:Arial;" transform="translate(40 58.6667)" fill="#54555a">10</text>
+<text dominant-baseline="central" text-anchor="end" style="font-size:9px;font-family:Arial;" transform="translate(40 30)" fill="#54555a">15</text>
+<text dominant-baseline="central" text-anchor="middle" style="font-size:9px;font-family:Arial;" y="4.5" transform="translate(90.5714 124)" fill="#54555a">1,024</text>
+<text dominant-baseline="central" text-anchor="middle" style="font-size:9px;font-family:Arial;" y="4.5" transform="translate(175.7143 124)" fill="#54555a">2,048</text>
+<text dominant-baseline="central" text-anchor="middle" style="font-size:9px;font-family:Arial;" y="4.5" transform="translate(260.8571 124)" fill="#54555a">4,096</text>
+<text dominant-baseline="central" text-anchor="middle" style="font-size:9px;font-family:Arial;" y="4.5" transform="translate(346 124)" fill="#54555a">8,192</text>
+<text dominant-baseline="central" text-anchor="middle" style="font-size:9px;font-family:Arial;" y="4.5" transform="translate(431.1429 124)" fill="#54555a">16,384</text>
+<text dominant-baseline="central" text-anchor="middle" style="font-size:9px;font-family:Arial;" y="4.5" transform="translate(516.2857 124)" fill="#54555a">32,768</text>
+<text dominant-baseline="central" text-anchor="middle" style="font-size:9px;font-family:Arial;" y="4.5" transform="translate(601.4286 124)" fill="#54555a">65,536</text>
+<g clip-path="url(#zr0-c0)">
+<path d="M90.6 76.6L175.7 75.2L260.9 78.3L346 77L431.1 76.6L516.3 76.4L601.4 77.1" fill="none" pointer-events="visible" stroke="#337eb9" stroke-width="1.6" stroke-linejoin="bevel" class="zr0-cls-2"></path>
+</g>
+<g clip-path="url(#zr0-c1)">
+<path d="M90.6 68.6L175.7 71.7L260.9 62.3L346 65.9L431.1 68.8L516.3 69.7L601.4 68.6" fill="none" pointer-events="visible" stroke="#25978f" stroke-width="1.6" stroke-linejoin="bevel" class="zr0-cls-2"></path>
+</g>
+<g clip-path="url(#zr0-c2)">
+<path d="M90.6 60.1L175.7 63.7L260.9 66.6L346 62.8L431.1 66.2L516.3 43.8L601.4 60.2" fill="none" pointer-events="visible" stroke="#74879d" stroke-width="1.6" stroke-linejoin="bevel" class="zr0-cls-2"></path>
+</g>
+<path d="M1 0A1 1 0 1 1 1 -0.1A1 1 0 0 1 1 0" transform="matrix(2,0,0,2,90.5714,76.5547)" fill="#fff" stroke="#337eb9" ecmeta_series_index="0" ecmeta_data_index="0" ecmeta_ssr_type="chart" class="zr0-cls-3"></path>
+<path d="M1 0A1 1 0 1 1 1 -0.1A1 1 0 0 1 1 0" transform="matrix(2,0,0,2,175.7143,75.1787)" fill="#fff" stroke="#337eb9" ecmeta_series_index="0" ecmeta_data_index="1" ecmeta_ssr_type="chart" class="zr0-cls-3"></path>
+<path d="M1 0A1 1 0 1 1 1 -0.1A1 1 0 0 1 1 0" transform="matrix(2,0,0,2,260.8571,78.2747)" fill="#fff" stroke="#337eb9" ecmeta_series_index="0" ecmeta_data_index="2" ecmeta_ssr_type="chart" class="zr0-cls-3"></path>
+<path d="M1 0A1 1 0 1 1 1 -0.1A1 1 0 0 1 1 0" transform="matrix(2,0,0,2,346,76.956)" fill="#fff" stroke="#337eb9" ecmeta_series_index="0" ecmeta_data_index="3" ecmeta_ssr_type="chart" class="zr0-cls-3"></path>
+<path d="M1 0A1 1 0 1 1 1 -0.1A1 1 0 0 1 1 0" transform="matrix(2,0,0,2,431.1429,76.612)" fill="#fff" stroke="#337eb9" ecmeta_series_index="0" ecmeta_data_index="4" ecmeta_ssr_type="chart" class="zr0-cls-3"></path>
+<path d="M1 0A1 1 0 1 1 1 -0.1A1 1 0 0 1 1 0" transform="matrix(2,0,0,2,516.2857,76.44)" fill="#fff" stroke="#337eb9" ecmeta_series_index="0" ecmeta_data_index="5" ecmeta_ssr_type="chart" class="zr0-cls-3"></path>
+<path d="M1 0A1 1 0 1 1 1 -0.1A1 1 0 0 1 1 0" transform="matrix(2,0,0,2,601.4286,77.128)" fill="#fff" stroke="#337eb9" ecmeta_series_index="0" ecmeta_data_index="6" ecmeta_ssr_type="chart" class="zr0-cls-3"></path>
+<path d="M1 0A1 1 0 1 1 1 -0.1A1 1 0 0 1 1 0" transform="matrix(2,0,0,2,90.5714,68.6427)" fill="#fff" stroke="#25978f" ecmeta_series_index="1" ecmeta_data_index="0" ecmeta_ssr_type="chart" class="zr0-cls-3"></path>
+<path d="M1 0A1 1 0 1 1 1 -0.1A1 1 0 0 1 1 0" transform="matrix(2,0,0,2,175.7143,71.6813)" fill="#fff" stroke="#25978f" ecmeta_series_index="1" ecmeta_data_index="1" ecmeta_ssr_type="chart" class="zr0-cls-3"></path>
+<path d="M1 0A1 1 0 1 1 1 -0.1A1 1 0 0 1 1 0" transform="matrix(2,0,0,2,260.8571,62.336)" fill="#fff" stroke="#25978f" ecmeta_series_index="1" ecmeta_data_index="2" ecmeta_ssr_type="chart" class="zr0-cls-3"></path>
+<path d="M1 0A1 1 0 1 1 1 -0.1A1 1 0 0 1 1 0" transform="matrix(2,0,0,2,346,65.948)" fill="#fff" stroke="#25978f" ecmeta_series_index="1" ecmeta_data_index="3" ecmeta_ssr_type="chart" class="zr0-cls-3"></path>
+<path d="M1 0A1 1 0 1 1 1 -0.1A1 1 0 0 1 1 0" transform="matrix(2,0,0,2,431.1429,68.7573)" fill="#fff" stroke="#25978f" ecmeta_series_index="1" ecmeta_data_index="4" ecmeta_ssr_type="chart" class="zr0-cls-3"></path>
+<path d="M1 0A1 1 0 1 1 1 -0.1A1 1 0 0 1 1 0" transform="matrix(2,0,0,2,516.2857,69.732)" fill="#fff" stroke="#25978f" ecmeta_series_index="1" ecmeta_data_index="5" ecmeta_ssr_type="chart" class="zr0-cls-3"></path>
+<path d="M1 0A1 1 0 1 1 1 -0.1A1 1 0 0 1 1 0" transform="matrix(2,0,0,2,601.4286,68.5853)" fill="#fff" stroke="#25978f" ecmeta_series_index="1" ecmeta_data_index="6" ecmeta_ssr_type="chart" class="zr0-cls-3"></path>
+<path d="M1 0A1 1 0 1 1 1 -0.1A1 1 0 0 1 1 0" transform="matrix(2,0,0,2,90.5714,60.1)" fill="#fff" stroke="#74879d" ecmeta_series_index="2" ecmeta_data_index="0" ecmeta_ssr_type="chart" class="zr0-cls-3"></path>
+<path d="M1 0A1 1 0 1 1 1 -0.1A1 1 0 0 1 1 0" transform="matrix(2,0,0,2,175.7143,63.6547)" fill="#fff" stroke="#74879d" ecmeta_series_index="2" ecmeta_data_index="1" ecmeta_ssr_type="chart" class="zr0-cls-3"></path>
+<path d="M1 0A1 1 0 1 1 1 -0.1A1 1 0 0 1 1 0" transform="matrix(2,0,0,2,260.8571,66.636)" fill="#fff" stroke="#74879d" ecmeta_series_index="2" ecmeta_data_index="2" ecmeta_ssr_type="chart" class="zr0-cls-3"></path>
+<path d="M1 0A1 1 0 1 1 1 -0.1A1 1 0 0 1 1 0" transform="matrix(2,0,0,2,346,62.7947)" fill="#fff" stroke="#74879d" ecmeta_series_index="2" ecmeta_data_index="3" ecmeta_ssr_type="chart" class="zr0-cls-3"></path>
+<path d="M1 0A1 1 0 1 1 1 -0.1A1 1 0 0 1 1 0" transform="matrix(2,0,0,2,431.1429,66.1773)" fill="#fff" stroke="#74879d" ecmeta_series_index="2" ecmeta_data_index="4" ecmeta_ssr_type="chart" class="zr0-cls-3"></path>
+<path d="M1 0A1 1 0 1 1 1 -0.1A1 1 0 0 1 1 0" transform="matrix(2,0,0,2,516.2857,43.8173)" fill="#fff" stroke="#74879d" ecmeta_series_index="2" ecmeta_data_index="5" ecmeta_ssr_type="chart" class="zr0-cls-3"></path>
+<path d="M1 0A1 1 0 1 1 1 -0.1A1 1 0 0 1 1 0" transform="matrix(2,0,0,2,601.4286,60.1573)" fill="#fff" stroke="#74879d" ecmeta_series_index="2" ecmeta_data_index="6" ecmeta_ssr_type="chart" class="zr0-cls-3"></path>
+<path d="M-5 -5l133 0l0 20l-133 0Z" transform="translate(520 5)" fill="rgb(0,0,0)" fill-opacity="0" stroke="#b7b9be" stroke-width="0" class="zr0-cls-0"></path>
+<path d="M0 2.5L15 2.5" transform="translate(521 7.5)" fill="#000" stroke="#337eb9" stroke-width="2" stroke-linecap="butt" stroke-miterlimit="10" class="zr0-cls-0"></path>
+<path d="M9.5 2.5A2 2 0 1 1 9.5 2.3A2 2 0 0 1 9.5 2.5" transform="translate(521 7.5)" fill="#fff" stroke="#337eb9" stroke-width="2" stroke-linecap="butt" stroke-miterlimit="10" class="zr0-cls-0"></path>
+<text dominant-baseline="central" text-anchor="start" style="font-size:10px;font-family:Arial;" x="20" y="2.5" transform="translate(521 7.5)" fill="#54555a">C1</text>
+<path d="M-1 -2.5l33.8 0l0 10l-33.8 0Z" transform="translate(521 7.5)" fill="none" pointer-events="visible" ecmeta_series_index="0" ecmeta_data_index="0" ecmeta_ssr_type="legend" class="zr0-cls-4"></path>
+<path d="M0 2.5L15 2.5" transform="translate(562.8 7.5)" fill="#000" stroke="#25978f" stroke-width="2" stroke-linecap="butt" stroke-miterlimit="10" class="zr0-cls-0"></path>
+<path d="M9.5 2.5A2 2 0 1 1 9.5 2.3A2 2 0 0 1 9.5 2.5" transform="translate(562.8 7.5)" fill="#fff" stroke="#25978f" stroke-width="2" stroke-linecap="butt" stroke-miterlimit="10" class="zr0-cls-0"></path>
+<text dominant-baseline="central" text-anchor="start" style="font-size:10px;font-family:Arial;" x="20" y="2.5" transform="translate(562.8 7.5)" fill="#54555a">C5</text>
+<path d="M-1 -2.5l33.8 0l0 10l-33.8 0Z" transform="translate(562.8 7.5)" fill="none" pointer-events="visible" ecmeta_series_index="1" ecmeta_data_index="1" ecmeta_ssr_type="legend" class="zr0-cls-4"></path>
+<path d="M0 2.5L15 2.5" transform="translate(604.6 7.5)" fill="#000" stroke="#74879d" stroke-width="2" stroke-linecap="butt" stroke-miterlimit="10" class="zr0-cls-0"></path>
+<path d="M9.5 2.5A2 2 0 1 1 9.5 2.3A2 2 0 0 1 9.5 2.5" transform="translate(604.6 7.5)" fill="#fff" stroke="#74879d" stroke-width="2" stroke-linecap="butt" stroke-miterlimit="10" class="zr0-cls-0"></path>
+<text dominant-baseline="central" text-anchor="start" style="font-size:10px;font-family:Arial;" x="20" y="2.5" transform="translate(604.6 7.5)" fill="#54555a">C10</text>
+<path d="M-1 -2.5l39.4 0l0 10l-39.4 0Z" transform="translate(604.6 7.5)" fill="none" pointer-events="visible" ecmeta_series_index="2" ecmeta_data_index="2" ecmeta_ssr_type="legend" class="zr0-cls-4"></path>
+<path d="M1 0A1 1 0 1 1 1 -0.1A1 1 0 0 1 1 0" transform="matrix(8,0,0,8,516.2857,43.8173)" fill="#a76a22" ecmeta_series_index="2" ecmeta_data_index="0" ecmeta_ssr_type="chart" class="zr0-cls-5"></path>
+<text dominant-baseline="central" text-anchor="middle" style="font-size:10px;font-family:Arial;" transform="translate(516.2857 43.8173)" fill="#fff">A</text>
+<defs >
+<clipPath id="zr0-c0">
+<path d="M47 29.2l599 0l0 87.6l-599 0Z" fill="#000" class="zr0-cls-1"></path>
+</clipPath>
+<clipPath id="zr0-c1">
+<path d="M47 29.2l599 0l0 87.6l-599 0Z" fill="#000" class="zr0-cls-1"></path>
+</clipPath>
+<clipPath id="zr0-c2">
+<path d="M47 29.2l599 0l0 87.6l-599 0Z" fill="#000" class="zr0-cls-1"></path>
+</clipPath>
+</defs>
+<style ><![CDATA[
+.zr0-cls-0:hover {
+pointer-events:none;
+}
+.zr0-cls-1:hover {
+cursor:pointer;
+fill:rgba(0,0,0,1);
+}
+.zr0-cls-2:hover {
+cursor:pointer;
+}
+.zr0-cls-3:hover {
+cursor:pointer;
+fill:rgba(255,255,255,1);
+}
+.zr0-cls-4:hover {
+cursor:pointer;
+fill:rgba(0,0,0,0);
+}
+.zr0-cls-5:hover {
+cursor:pointer;
+fill:rgba(183,116,37,1);
+}
+
+]]>
+
+</style>
+</svg></figure>
+    <div class="note ">所有组合状态均为 completed；各组合结束原因为完成。协议完成不代表回答完整或答案正确。C1 / C5 / C10 的样本数分别为 3 / 15 / 30。</div>
+  </div><footer class="footer"><span>Qwen3.8-27B · 2026-09-09</span><span>04 / 12</span></footer></article><article class="sheet" aria-label="第 5 页：关闭思考 · 输出与 Token"><header class="masthead"><div class="brand">InferPulse <span>Bench</span></div></header><h1>关闭思考 · 输出与 Token</h1><p class="subtitle">区分单请求速率、聚合吞吐和服务端用量</p><div class="page-content">
+    <p class="lead">速率 tok/s；TPOT ms/Token。前两项依次列出 P50 / P95；四类 Token 均为 P50。</p>
+    <table class="double-line compact"><thead><tr><th scope="col">输入字符</th><th scope="col">并发</th><th scope="col">单请求速率<br>P50 / P95</th><th scope="col">TPOT<br>P50 / P95</th><th scope="col">聚合吞吐</th><th scope="col">输入<br>Token</th><th scope="col">输出<br>Token</th><th scope="col">思考<br>Token</th><th scope="col">缓存<br>Token</th></tr></thead><tbody><tr class="group-start"><td>1,024</td><td>1</td><td>875.79/876.85</td><td>1.14/1.14</td><td>625.23</td><td>100.00</td><td>12.00</td><td>0.00</td><td>N/A</td></tr><tr><td>1,024</td><td>5</td><td>877.73/1006.50</td><td>1.14/1.16</td><td>2886.78</td><td>100.00</td><td>12.00</td><td>0.00</td><td>N/A</td></tr><tr><td>1,024</td><td>10</td><td>872.21/986.11</td><td>1.14/1.19</td><td>5289.45</td><td>100.00</td><td>12.00</td><td>0.00</td><td>N/A</td></tr><tr class="group-start"><td>2,048</td><td>1</td><td>877.47/902.69</td><td>1.14/1.14</td><td>620.40</td><td>100.00</td><td>12.00</td><td>0.00</td><td>N/A</td></tr><tr><td>2,048</td><td>5</td><td>870.60/895.37</td><td>1.15/1.22</td><td>2909.24</td><td>100.00</td><td>12.00</td><td>0.00</td><td>N/A</td></tr><tr><td>2,048</td><td>10</td><td>876.37/989.14</td><td>1.14/1.22</td><td>5453.47</td><td>100.00</td><td>12.00</td><td>0.00</td><td>N/A</td></tr><tr class="group-start"><td>4,096</td><td>1</td><td>878.18/879.04</td><td>1.14/1.14</td><td>628.40</td><td>100.00</td><td>12.00</td><td>0.00</td><td>N/A</td></tr><tr><td>4,096</td><td>5</td><td>868.99/1012.61</td><td>1.15/1.20</td><td>2822.96</td><td>100.00</td><td>12.00</td><td>0.00</td><td>N/A</td></tr><tr><td>4,096</td><td>10</td><td>872.01/1011.96</td><td>1.14/1.22</td><td>5501.49</td><td>100.00</td><td>12.00</td><td>0.00</td><td>N/A</td></tr><tr class="group-start"><td>8,192</td><td>1</td><td>876.50/878.90</td><td>1.14/1.14</td><td>617.26</td><td>100.00</td><td>12.00</td><td>0.00</td><td>N/A</td></tr><tr><td>8,192</td><td>5</td><td>876.05/977.73</td><td>1.14/1.22</td><td>2834.79</td><td>100.00</td><td>12.00</td><td>0.00</td><td>N/A</td></tr><tr><td>8,192</td><td>10</td><td>874.91/980.39</td><td>1.14/1.21</td><td>5380.65</td><td>100.00</td><td>12.00</td><td>0.00</td><td>N/A</td></tr><tr class="group-start"><td>16,384</td><td>1</td><td>874.95/876.58</td><td>1.14/1.19</td><td>615.70</td><td>100.00</td><td>12.00</td><td>0.00</td><td>N/A</td></tr><tr><td>16,384</td><td>5</td><td>878.46/988.29</td><td>1.14/1.18</td><td>2897.30</td><td>100.00</td><td>12.00</td><td>0.00</td><td>N/A</td></tr><tr><td>16,384</td><td>10</td><td>880.54/989.32</td><td>1.12/1.19</td><td>5646.52</td><td>100.00</td><td>12.00</td><td>0.00</td><td>N/A</td></tr><tr class="group-start"><td>32,768</td><td>1</td><td>874.87/877.83</td><td>1.14/1.14</td><td>620.72</td><td>100.00</td><td>12.00</td><td>0.00</td><td>N/A</td></tr><tr><td>32,768</td><td>5</td><td>898.23/1073.68</td><td>1.11/1.27</td><td>2932.16</td><td>100.00</td><td>12.00</td><td>0.00</td><td>N/A</td></tr><tr><td>32,768</td><td>10</td><td>917.64/1071.92</td><td>1.08/1.17</td><td>4521.46</td><td>100.00</td><td>12.00</td><td>0.00</td><td>N/A</td></tr><tr class="group-start"><td>65,536</td><td>1</td><td>877.17/878.58</td><td>1.14/1.14</td><td>625.19</td><td>100.00</td><td>12.00</td><td>0.00</td><td>N/A</td></tr><tr><td>65,536</td><td>5</td><td>877.24/1070.69</td><td>1.14/1.16</td><td>2875.65</td><td>100.00</td><td>12.00</td><td>0.00</td><td>N/A</td></tr><tr><td>65,536</td><td>10</td><td>888.72/1010.62</td><td>1.11/1.24</td><td>5498.21</td><td>100.00</td><td>12.00</td><td>0.00</td><td>N/A</td></tr></tbody></table>
+    <figure><figcaption>关闭思考 · 聚合输出吞吐随输入规模变化<span>A：关注点 · 见第 10 页；横轴：字符；C：并发</span></figcaption><svg role="img" aria-label="关闭思考 · 聚合输出吞吐随输入规模变化" width="660" height="150" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" version="1.1" baseProfile="full" viewBox="0 0 660 150">
+<rect width="660" height="150" x="0" y="0" fill="none"></rect>
+<path d="M48 116.5L644 116.5" fill="none" pointer-events="visible" stroke="#e9eff5" class="zr1-cls-6"></path>
+<path d="M48 87.5L644 87.5" fill="none" pointer-events="visible" stroke="#e9eff5" class="zr1-cls-6"></path>
+<path d="M48 58.5L644 58.5" fill="none" pointer-events="visible" stroke="#e9eff5" class="zr1-cls-6"></path>
+<path d="M48 30.5L644 30.5" fill="none" pointer-events="visible" stroke="#e9eff5" class="zr1-cls-6"></path>
+<text dominant-baseline="central" text-anchor="middle" style="font-size:10px;font-family:Arial;" y="-5" transform="translate(48 15)" fill="#415971">tok/s</text>
+<path d="M48 116.5L644 116.5" fill="none" pointer-events="visible" stroke="#ccd8e4" stroke-linecap="round" class="zr1-cls-6"></path>
+<text dominant-baseline="central" text-anchor="end" style="font-size:9px;font-family:Arial;" transform="translate(40 116)" fill="#54555a">0</text>
+<text dominant-baseline="central" text-anchor="end" style="font-size:9px;font-family:Arial;" transform="translate(40 87.3333)" fill="#54555a">2,000</text>
+<text dominant-baseline="central" text-anchor="end" style="font-size:9px;font-family:Arial;" transform="translate(40 58.6667)" fill="#54555a">4,000</text>
+<text dominant-baseline="central" text-anchor="end" style="font-size:9px;font-family:Arial;" transform="translate(40 30)" fill="#54555a">6,000</text>
+<text dominant-baseline="central" text-anchor="middle" style="font-size:9px;font-family:Arial;" y="4.5" transform="translate(90.5714 124)" fill="#54555a">1,024</text>
+<text dominant-baseline="central" text-anchor="middle" style="font-size:9px;font-family:Arial;" y="4.5" transform="translate(175.7143 124)" fill="#54555a">2,048</text>
+<text dominant-baseline="central" text-anchor="middle" style="font-size:9px;font-family:Arial;" y="4.5" transform="translate(260.8571 124)" fill="#54555a">4,096</text>
+<text dominant-baseline="central" text-anchor="middle" style="font-size:9px;font-family:Arial;" y="4.5" transform="translate(346 124)" fill="#54555a">8,192</text>
+<text dominant-baseline="central" text-anchor="middle" style="font-size:9px;font-family:Arial;" y="4.5" transform="translate(431.1429 124)" fill="#54555a">16,384</text>
+<text dominant-baseline="central" text-anchor="middle" style="font-size:9px;font-family:Arial;" y="4.5" transform="translate(516.2857 124)" fill="#54555a">32,768</text>
+<text dominant-baseline="central" text-anchor="middle" style="font-size:9px;font-family:Arial;" y="4.5" transform="translate(601.4286 124)" fill="#54555a">65,536</text>
+<g clip-path="url(#zr1-c0)">
+<path d="M90.6 107L175.7 107.1L260.9 107L346 107.2L431.1 107.2L516.3 107.1L601.4 107" fill="none" pointer-events="visible" stroke="#337eb9" stroke-width="1.6" stroke-linejoin="bevel" class="zr1-cls-8"></path>
+</g>
+<g clip-path="url(#zr1-c1)">
+<path d="M90.6 74.6L175.7 74.3L260.9 75.5L346 75.4L431.1 74.5L516.3 74L601.4 74.8" fill="none" pointer-events="visible" stroke="#25978f" stroke-width="1.6" stroke-linejoin="bevel" class="zr1-cls-8"></path>
+</g>
+<g clip-path="url(#zr1-c2)">
+<path d="M90.6 40.2L175.7 37.8L260.9 37.1L346 38.9L431.1 35.1L516.3 51.2L601.4 37.2" fill="none" pointer-events="visible" stroke="#74879d" stroke-width="1.6" stroke-linejoin="bevel" class="zr1-cls-8"></path>
+</g>
+<path d="M1 0A1 1 0 1 1 1 -0.1A1 1 0 0 1 1 0" transform="matrix(2,0,0,2,90.5714,107.0384)" fill="#fff" stroke="#337eb9" ecmeta_series_index="0" ecmeta_data_index="0" ecmeta_ssr_type="chart" class="zr1-cls-9"></path>
+<path d="M1 0A1 1 0 1 1 1 -0.1A1 1 0 0 1 1 0" transform="matrix(2,0,0,2,175.7143,107.1076)" fill="#fff" stroke="#337eb9" ecmeta_series_index="0" ecmeta_data_index="1" ecmeta_ssr_type="chart" class="zr1-cls-9"></path>
+<path d="M1 0A1 1 0 1 1 1 -0.1A1 1 0 0 1 1 0" transform="matrix(2,0,0,2,260.8571,106.9929)" fill="#fff" stroke="#337eb9" ecmeta_series_index="0" ecmeta_data_index="2" ecmeta_ssr_type="chart" class="zr1-cls-9"></path>
+<path d="M1 0A1 1 0 1 1 1 -0.1A1 1 0 0 1 1 0" transform="matrix(2,0,0,2,346,107.1526)" fill="#fff" stroke="#337eb9" ecmeta_series_index="0" ecmeta_data_index="3" ecmeta_ssr_type="chart" class="zr1-cls-9"></path>
+<path d="M1 0A1 1 0 1 1 1 -0.1A1 1 0 0 1 1 0" transform="matrix(2,0,0,2,431.1429,107.175)" fill="#fff" stroke="#337eb9" ecmeta_series_index="0" ecmeta_data_index="4" ecmeta_ssr_type="chart" class="zr1-cls-9"></path>
+<path d="M1 0A1 1 0 1 1 1 -0.1A1 1 0 0 1 1 0" transform="matrix(2,0,0,2,516.2857,107.103)" fill="#fff" stroke="#337eb9" ecmeta_series_index="0" ecmeta_data_index="5" ecmeta_ssr_type="chart" class="zr1-cls-9"></path>
+<path d="M1 0A1 1 0 1 1 1 -0.1A1 1 0 0 1 1 0" transform="matrix(2,0,0,2,601.4286,107.0389)" fill="#fff" stroke="#337eb9" ecmeta_series_index="0" ecmeta_data_index="6" ecmeta_ssr_type="chart" class="zr1-cls-9"></path>
+<path d="M1 0A1 1 0 1 1 1 -0.1A1 1 0 0 1 1 0" transform="matrix(2,0,0,2,90.5714,74.6228)" fill="#fff" stroke="#25978f" ecmeta_series_index="1" ecmeta_data_index="0" ecmeta_ssr_type="chart" class="zr1-cls-9"></path>
+<path d="M1 0A1 1 0 1 1 1 -0.1A1 1 0 0 1 1 0" transform="matrix(2,0,0,2,175.7143,74.3009)" fill="#fff" stroke="#25978f" ecmeta_series_index="1" ecmeta_data_index="1" ecmeta_ssr_type="chart" class="zr1-cls-9"></path>
+<path d="M1 0A1 1 0 1 1 1 -0.1A1 1 0 0 1 1 0" transform="matrix(2,0,0,2,260.8571,75.5376)" fill="#fff" stroke="#25978f" ecmeta_series_index="1" ecmeta_data_index="2" ecmeta_ssr_type="chart" class="zr1-cls-9"></path>
+<path d="M1 0A1 1 0 1 1 1 -0.1A1 1 0 0 1 1 0" transform="matrix(2,0,0,2,346,75.368)" fill="#fff" stroke="#25978f" ecmeta_series_index="1" ecmeta_data_index="3" ecmeta_ssr_type="chart" class="zr1-cls-9"></path>
+<path d="M1 0A1 1 0 1 1 1 -0.1A1 1 0 0 1 1 0" transform="matrix(2,0,0,2,431.1429,74.472)" fill="#fff" stroke="#25978f" ecmeta_series_index="1" ecmeta_data_index="4" ecmeta_ssr_type="chart" class="zr1-cls-9"></path>
+<path d="M1 0A1 1 0 1 1 1 -0.1A1 1 0 0 1 1 0" transform="matrix(2,0,0,2,516.2857,73.9724)" fill="#fff" stroke="#25978f" ecmeta_series_index="1" ecmeta_data_index="5" ecmeta_ssr_type="chart" class="zr1-cls-9"></path>
+<path d="M1 0A1 1 0 1 1 1 -0.1A1 1 0 0 1 1 0" transform="matrix(2,0,0,2,601.4286,74.7823)" fill="#fff" stroke="#25978f" ecmeta_series_index="1" ecmeta_data_index="6" ecmeta_ssr_type="chart" class="zr1-cls-9"></path>
+<path d="M1 0A1 1 0 1 1 1 -0.1A1 1 0 0 1 1 0" transform="matrix(2,0,0,2,90.5714,40.1846)" fill="#fff" stroke="#74879d" ecmeta_series_index="2" ecmeta_data_index="0" ecmeta_ssr_type="chart" class="zr1-cls-9"></path>
+<path d="M1 0A1 1 0 1 1 1 -0.1A1 1 0 0 1 1 0" transform="matrix(2,0,0,2,175.7143,37.8336)" fill="#fff" stroke="#74879d" ecmeta_series_index="2" ecmeta_data_index="1" ecmeta_ssr_type="chart" class="zr1-cls-9"></path>
+<path d="M1 0A1 1 0 1 1 1 -0.1A1 1 0 0 1 1 0" transform="matrix(2,0,0,2,260.8571,37.1453)" fill="#fff" stroke="#74879d" ecmeta_series_index="2" ecmeta_data_index="2" ecmeta_ssr_type="chart" class="zr1-cls-9"></path>
+<path d="M1 0A1 1 0 1 1 1 -0.1A1 1 0 0 1 1 0" transform="matrix(2,0,0,2,346,38.8773)" fill="#fff" stroke="#74879d" ecmeta_series_index="2" ecmeta_data_index="3" ecmeta_ssr_type="chart" class="zr1-cls-9"></path>
+<path d="M1 0A1 1 0 1 1 1 -0.1A1 1 0 0 1 1 0" transform="matrix(2,0,0,2,431.1429,35.0665)" fill="#fff" stroke="#74879d" ecmeta_series_index="2" ecmeta_data_index="4" ecmeta_ssr_type="chart" class="zr1-cls-9"></path>
+<path d="M1 0A1 1 0 1 1 1 -0.1A1 1 0 0 1 1 0" transform="matrix(2,0,0,2,516.2857,51.1924)" fill="#fff" stroke="#74879d" ecmeta_series_index="2" ecmeta_data_index="5" ecmeta_ssr_type="chart" class="zr1-cls-9"></path>
+<path d="M1 0A1 1 0 1 1 1 -0.1A1 1 0 0 1 1 0" transform="matrix(2,0,0,2,601.4286,37.1923)" fill="#fff" stroke="#74879d" ecmeta_series_index="2" ecmeta_data_index="6" ecmeta_ssr_type="chart" class="zr1-cls-9"></path>
+<path d="M-5 -5l133 0l0 20l-133 0Z" transform="translate(520 5)" fill="rgb(0,0,0)" fill-opacity="0" stroke="#b7b9be" stroke-width="0" class="zr1-cls-6"></path>
+<path d="M0 2.5L15 2.5" transform="translate(521 7.5)" fill="#000" stroke="#337eb9" stroke-width="2" stroke-linecap="butt" stroke-miterlimit="10" class="zr1-cls-6"></path>
+<path d="M9.5 2.5A2 2 0 1 1 9.5 2.3A2 2 0 0 1 9.5 2.5" transform="translate(521 7.5)" fill="#fff" stroke="#337eb9" stroke-width="2" stroke-linecap="butt" stroke-miterlimit="10" class="zr1-cls-6"></path>
+<text dominant-baseline="central" text-anchor="start" style="font-size:10px;font-family:Arial;" x="20" y="2.5" transform="translate(521 7.5)" fill="#54555a">C1</text>
+<path d="M-1 -2.5l33.8 0l0 10l-33.8 0Z" transform="translate(521 7.5)" fill="none" pointer-events="visible" ecmeta_series_index="0" ecmeta_data_index="0" ecmeta_ssr_type="legend" class="zr1-cls-10"></path>
+<path d="M0 2.5L15 2.5" transform="translate(562.8 7.5)" fill="#000" stroke="#25978f" stroke-width="2" stroke-linecap="butt" stroke-miterlimit="10" class="zr1-cls-6"></path>
+<path d="M9.5 2.5A2 2 0 1 1 9.5 2.3A2 2 0 0 1 9.5 2.5" transform="translate(562.8 7.5)" fill="#fff" stroke="#25978f" stroke-width="2" stroke-linecap="butt" stroke-miterlimit="10" class="zr1-cls-6"></path>
+<text dominant-baseline="central" text-anchor="start" style="font-size:10px;font-family:Arial;" x="20" y="2.5" transform="translate(562.8 7.5)" fill="#54555a">C5</text>
+<path d="M-1 -2.5l33.8 0l0 10l-33.8 0Z" transform="translate(562.8 7.5)" fill="none" pointer-events="visible" ecmeta_series_index="1" ecmeta_data_index="1" ecmeta_ssr_type="legend" class="zr1-cls-10"></path>
+<path d="M0 2.5L15 2.5" transform="translate(604.6 7.5)" fill="#000" stroke="#74879d" stroke-width="2" stroke-linecap="butt" stroke-miterlimit="10" class="zr1-cls-6"></path>
+<path d="M9.5 2.5A2 2 0 1 1 9.5 2.3A2 2 0 0 1 9.5 2.5" transform="translate(604.6 7.5)" fill="#fff" stroke="#74879d" stroke-width="2" stroke-linecap="butt" stroke-miterlimit="10" class="zr1-cls-6"></path>
+<text dominant-baseline="central" text-anchor="start" style="font-size:10px;font-family:Arial;" x="20" y="2.5" transform="translate(604.6 7.5)" fill="#54555a">C10</text>
+<path d="M-1 -2.5l39.4 0l0 10l-39.4 0Z" transform="translate(604.6 7.5)" fill="none" pointer-events="visible" ecmeta_series_index="2" ecmeta_data_index="2" ecmeta_ssr_type="legend" class="zr1-cls-10"></path>
+<path d="M1 0A1 1 0 1 1 1 -0.1A1 1 0 0 1 1 0" transform="matrix(8,0,0,8,516.2857,51.1924)" fill="#a76a22" ecmeta_series_index="2" ecmeta_data_index="0" ecmeta_ssr_type="chart" class="zr1-cls-11"></path>
+<text dominant-baseline="central" text-anchor="middle" style="font-size:10px;font-family:Arial;" transform="translate(516.2857 51.1924)" fill="#fff">A</text>
+<defs >
+<clipPath id="zr1-c0">
+<path d="M47 29.2l599 0l0 87.6l-599 0Z" fill="#000" class="zr1-cls-7"></path>
+</clipPath>
+<clipPath id="zr1-c1">
+<path d="M47 29.2l599 0l0 87.6l-599 0Z" fill="#000" class="zr1-cls-7"></path>
+</clipPath>
+<clipPath id="zr1-c2">
+<path d="M47 29.2l599 0l0 87.6l-599 0Z" fill="#000" class="zr1-cls-7"></path>
+</clipPath>
+</defs>
+<style ><![CDATA[
+.zr1-cls-6:hover {
+pointer-events:none;
+}
+.zr1-cls-7:hover {
+cursor:pointer;
+fill:rgba(0,0,0,1);
+}
+.zr1-cls-8:hover {
+cursor:pointer;
+}
+.zr1-cls-9:hover {
+cursor:pointer;
+fill:rgba(255,255,255,1);
+}
+.zr1-cls-10:hover {
+cursor:pointer;
+fill:rgba(0,0,0,0);
+}
+.zr1-cls-11:hover {
+cursor:pointer;
+fill:rgba(183,116,37,1);
+}
+
+]]>
+
+</style>
+</svg></figure>
+    <div class="note ">聚合吞吐是组合层级结果，没有 P50 / P95。缓存 Token 为 N/A 表示缺少观测，不表示缓存为零。输入字符数与实际输入 Token 分开展示。</div>
+  </div><footer class="footer"><span>Qwen3.8-27B · 2026-09-09</span><span>05 / 12</span></footer></article><article class="sheet" aria-label="第 6 页：关闭思考 · 证据完整性"><header class="masthead"><div class="brand">InferPulse <span>Bench</span></div></header><h1>关闭思考 · 证据完整性</h1><p class="subtitle">失败、未知、截断与不可计算值均保留</p><div class="page-content">
+    <table class="evidence-table"><thead><tr><th scope="col">输入字符</th><th scope="col">并发</th><th scope="col">usage 覆盖</th><th scope="col">最终回答 / 未知</th><th scope="col">截断</th><th scope="col">速率有效样本</th><th scope="col">失败或跳过原因</th></tr></thead><tbody><tr class="group-start"><td>1,024</td><td>1</td><td>100.0%</td><td>3/0</td><td>0</td><td>3</td><td>—</td></tr><tr><td>1,024</td><td>5</td><td>100.0%</td><td>15/0</td><td>0</td><td>15</td><td>—</td></tr><tr><td>1,024</td><td>10</td><td>100.0%</td><td>30/0</td><td>0</td><td>30</td><td>—</td></tr><tr class="group-start"><td>2,048</td><td>1</td><td>100.0%</td><td>3/0</td><td>0</td><td>3</td><td>—</td></tr><tr><td>2,048</td><td>5</td><td>100.0%</td><td>15/0</td><td>0</td><td>15</td><td>—</td></tr><tr><td>2,048</td><td>10</td><td>100.0%</td><td>30/0</td><td>0</td><td>30</td><td>—</td></tr><tr class="group-start"><td>4,096</td><td>1</td><td>100.0%</td><td>3/0</td><td>0</td><td>3</td><td>—</td></tr><tr><td>4,096</td><td>5</td><td>100.0%</td><td>15/0</td><td>0</td><td>15</td><td>—</td></tr><tr><td>4,096</td><td>10</td><td>100.0%</td><td>30/0</td><td>0</td><td>30</td><td>—</td></tr><tr class="group-start"><td>8,192</td><td>1</td><td>100.0%</td><td>3/0</td><td>0</td><td>3</td><td>—</td></tr><tr><td>8,192</td><td>5</td><td>100.0%</td><td>15/0</td><td>0</td><td>15</td><td>—</td></tr><tr><td>8,192</td><td>10</td><td>100.0%</td><td>30/0</td><td>0</td><td>30</td><td>—</td></tr><tr class="group-start"><td>16,384</td><td>1</td><td>100.0%</td><td>3/0</td><td>0</td><td>3</td><td>—</td></tr><tr><td>16,384</td><td>5</td><td>100.0%</td><td>15/0</td><td>0</td><td>15</td><td>—</td></tr><tr><td>16,384</td><td>10</td><td>100.0%</td><td>30/0</td><td>0</td><td>30</td><td>—</td></tr><tr class="group-start"><td>32,768</td><td>1</td><td>100.0%</td><td>3/0</td><td>0</td><td>3</td><td>—</td></tr><tr><td>32,768</td><td>5</td><td>100.0%</td><td>15/0</td><td>0</td><td>15</td><td>—</td></tr><tr><td>32,768</td><td>10</td><td>100.0%</td><td>30/0</td><td>0</td><td>30</td><td>—</td></tr><tr class="group-start"><td>65,536</td><td>1</td><td>100.0%</td><td>3/0</td><td>0</td><td>3</td><td>—</td></tr><tr><td>65,536</td><td>5</td><td>100.0%</td><td>15/0</td><td>0</td><td>15</td><td>—</td></tr><tr><td>65,536</td><td>10</td><td>100.0%</td><td>30/0</td><td>0</td><td>30</td><td>—</td></tr></tbody></table>
+    <h2>最高全部请求成功的已测并发</h2>
+    <table class="envelope"><thead><tr><th scope="col">输入字符</th><th scope="col">1,024</th><th scope="col">2,048</th><th scope="col">4,096</th><th scope="col">8,192</th><th scope="col">16,384</th><th scope="col">32,768</th><th scope="col">65,536</th></tr></thead><tbody><tr class="group-start"><td>已测并发</td><td>10</td><td>10</td><td>10</td><td>10</td><td>10</td><td>10</td><td>10</td></tr></tbody></table>
+    <div class="note ">本次每档最高全部成功并发为 10，仅描述已测范围。它不是服务的绝对上限，也不是 SLA 或稳定容量结论。</div>
+    <div class="two explanations"><section><h3>已观测的完整性</h3><p>本次所有性能请求均有 usage 和可识别最终回答，未记录截断或未决请求。</p></section><section><h3>模式验证</h3><p>参数被接受；未观测到思考不能证明已关闭。不能仅以 HTTP 200 判断模式生效。</p></section></div>
+  </div><footer class="footer"><span>Qwen3.8-27B · 2026-09-09</span><span>06 / 12</span></footer></article><article class="sheet" aria-label="第 7 页：开启思考 · 请求与延迟"><header class="masthead"><div class="brand">InferPulse <span>Bench</span></div></header><h1>开启思考 · 请求与延迟</h1><p class="subtitle">4096 Token 输出预算 · 21 个组合</p><div class="page-content">
+    <p class="lead">TTFT / TTFO / E2E 均为客户端观测，单位 ms。每个单元格依次列出 P50 / P95。</p>
+    <table class="double-line"><thead><tr><th scope="col">输入字符</th><th scope="col">并发</th><th scope="col">发起 / 成功 / 未决</th><th scope="col">成功率</th><th scope="col">TTFT<br>P50 / P95</th><th scope="col">TTFO<br>P50 / P95</th><th scope="col">E2E<br>P50 / P95</th></tr></thead><tbody><tr class="group-start"><td>1,024</td><td>1</td><td>3/3/0</td><td>100.0%</td><td>6.60/6.72</td><td>14.09/14.24</td><td>26.64/26.85</td></tr><tr><td>1,024</td><td>5</td><td>15/15/0</td><td>100.0%</td><td>7.33/7.93</td><td>14.51/15.25</td><td>26.92/28.27</td></tr><tr><td>1,024</td><td>10</td><td>30/30/0</td><td>100.0%</td><td>8.43/9.84</td><td>15.31/16.93</td><td>28.07/29.62</td></tr><tr class="group-start"><td>2,048</td><td>1</td><td>3/3/0</td><td>100.0%</td><td>6.44/6.97</td><td>14.00/14.52</td><td>25.97/27.16</td></tr><tr><td>2,048</td><td>5</td><td>15/15/0</td><td>100.0%</td><td>7.21/7.82</td><td>14.55/15.33</td><td>26.55/28.76</td></tr><tr><td>2,048</td><td>10</td><td>30/30/0</td><td>100.0%</td><td>8.30/9.27</td><td>15.43/16.79</td><td>27.95/29.69</td></tr><tr class="group-start"><td>4,096</td><td>1</td><td>3/3/0</td><td>100.0%</td><td>6.74/6.86</td><td>14.26/14.38</td><td>26.93/27.04</td></tr><tr><td>4,096</td><td>5</td><td>15/15/0</td><td>100.0%</td><td>7.09/7.68</td><td>14.33/14.96</td><td>26.31/28.64</td></tr><tr><td>4,096</td><td>10</td><td>30/30/0</td><td>100.0%</td><td>8.54/9.19</td><td>15.32/16.44</td><td>28.08/29.23</td></tr><tr class="group-start"><td>8,192</td><td>1</td><td>3/3/0</td><td>100.0%</td><td>6.84/6.94</td><td>14.37/14.47</td><td>27.01/27.15</td></tr><tr><td>8,192</td><td>5</td><td>15/15/0</td><td>100.0%</td><td>7.43/9.91</td><td>14.71/17.45</td><td>27.50/30.06</td></tr><tr><td>8,192</td><td>10</td><td>30/30/0</td><td>100.0%</td><td>8.33/9.43</td><td>15.46/16.52</td><td>27.55/29.27</td></tr><tr class="group-start"><td>16,384</td><td>1</td><td>3/3/0</td><td>100.0%</td><td>6.83/7.08</td><td>14.34/14.60</td><td>26.75/26.99</td></tr><tr><td>16,384</td><td>5</td><td>15/15/0</td><td>100.0%</td><td>7.73/8.57</td><td>15.01/16.09</td><td>27.44/28.55</td></tr><tr><td>16,384</td><td>10</td><td>30/30/0</td><td>100.0%</td><td>7.90/8.91</td><td>14.91/16.48</td><td>27.62/28.91</td></tr><tr class="group-start"><td>32,768</td><td>1</td><td>3/3/0</td><td>100.0%</td><td>6.87/7.05</td><td>14.37/14.58</td><td>26.99/27.22</td></tr><tr><td>32,768</td><td>5</td><td>15/15/0</td><td>100.0%</td><td>7.66/8.91</td><td>15.65/16.39</td><td>27.95/29.19</td></tr><tr><td>32,768</td><td>10</td><td>30/30/0</td><td>100.0%</td><td>8.22/9.29</td><td>15.30/16.83</td><td>27.85/28.79</td></tr><tr class="group-start"><td>65,536</td><td>1</td><td>3/3/0</td><td>100.0%</td><td>6.30/6.88</td><td>13.87/14.34</td><td>26.43/26.49</td></tr><tr><td>65,536</td><td>5</td><td>15/15/0</td><td>100.0%</td><td>7.86/8.66</td><td>15.22/16.18</td><td>27.93/28.72</td></tr><tr><td>65,536</td><td>10</td><td>30/30/0</td><td>100.0%</td><td>8.52/10.74</td><td>15.91/18.20</td><td>27.40/31.27</td></tr></tbody></table>
+    <figure><figcaption>开启思考 · TTFT P95 随输入规模变化<span>横轴：字符；C：并发</span></figcaption><svg role="img" aria-label="开启思考 · TTFT P95 随输入规模变化" width="660" height="150" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" version="1.1" baseProfile="full" viewBox="0 0 660 150">
+<rect width="660" height="150" x="0" y="0" fill="none"></rect>
+<path d="M48 116.5L644 116.5" fill="none" pointer-events="visible" stroke="#e9eff5" class="zr2-cls-12"></path>
+<path d="M48 94.5L644 94.5" fill="none" pointer-events="visible" stroke="#e9eff5" class="zr2-cls-12"></path>
+<path d="M48 73.5L644 73.5" fill="none" pointer-events="visible" stroke="#e9eff5" class="zr2-cls-12"></path>
+<path d="M48 51.5L644 51.5" fill="none" pointer-events="visible" stroke="#e9eff5" class="zr2-cls-12"></path>
+<path d="M48 30.5L644 30.5" fill="none" pointer-events="visible" stroke="#e9eff5" class="zr2-cls-12"></path>
+<text dominant-baseline="central" text-anchor="middle" style="font-size:10px;font-family:Arial;" y="-5" transform="translate(48 15)" fill="#415971">ms</text>
+<path d="M48 116.5L644 116.5" fill="none" pointer-events="visible" stroke="#ccd8e4" stroke-linecap="round" class="zr2-cls-12"></path>
+<text dominant-baseline="central" text-anchor="end" style="font-size:9px;font-family:Arial;" transform="translate(40 116)" fill="#54555a">0</text>
+<text dominant-baseline="central" text-anchor="end" style="font-size:9px;font-family:Arial;" transform="translate(40 94.5)" fill="#54555a">3</text>
+<text dominant-baseline="central" text-anchor="end" style="font-size:9px;font-family:Arial;" transform="translate(40 73)" fill="#54555a">6</text>
+<text dominant-baseline="central" text-anchor="end" style="font-size:9px;font-family:Arial;" transform="translate(40 51.5)" fill="#54555a">9</text>
+<text dominant-baseline="central" text-anchor="end" style="font-size:9px;font-family:Arial;" transform="translate(40 30)" fill="#54555a">12</text>
+<text dominant-baseline="central" text-anchor="middle" style="font-size:9px;font-family:Arial;" y="4.5" transform="translate(90.5714 124)" fill="#54555a">1,024</text>
+<text dominant-baseline="central" text-anchor="middle" style="font-size:9px;font-family:Arial;" y="4.5" transform="translate(175.7143 124)" fill="#54555a">2,048</text>
+<text dominant-baseline="central" text-anchor="middle" style="font-size:9px;font-family:Arial;" y="4.5" transform="translate(260.8571 124)" fill="#54555a">4,096</text>
+<text dominant-baseline="central" text-anchor="middle" style="font-size:9px;font-family:Arial;" y="4.5" transform="translate(346 124)" fill="#54555a">8,192</text>
+<text dominant-baseline="central" text-anchor="middle" style="font-size:9px;font-family:Arial;" y="4.5" transform="translate(431.1429 124)" fill="#54555a">16,384</text>
+<text dominant-baseline="central" text-anchor="middle" style="font-size:9px;font-family:Arial;" y="4.5" transform="translate(516.2857 124)" fill="#54555a">32,768</text>
+<text dominant-baseline="central" text-anchor="middle" style="font-size:9px;font-family:Arial;" y="4.5" transform="translate(601.4286 124)" fill="#54555a">65,536</text>
+<g clip-path="url(#zr2-c0)">
+<path d="M90.6 67.8L175.7 66L260.9 66.8L346 66.3L431.1 65.3L516.3 65.5L601.4 66.7" fill="none" pointer-events="visible" stroke="#337eb9" stroke-width="1.6" stroke-linejoin="bevel" class="zr2-cls-14"></path>
+</g>
+<g clip-path="url(#zr2-c1)">
+<path d="M90.6 59.2L175.7 60L260.9 61L346 45L431.1 54.6L516.3 52.1L601.4 53.9" fill="none" pointer-events="visible" stroke="#25978f" stroke-width="1.6" stroke-linejoin="bevel" class="zr2-cls-14"></path>
+</g>
+<g clip-path="url(#zr2-c2)">
+<path d="M90.6 45.5L175.7 49.6L260.9 50.1L346 48.4L431.1 52.1L516.3 49.4L601.4 39" fill="none" pointer-events="visible" stroke="#74879d" stroke-width="1.6" stroke-linejoin="bevel" class="zr2-cls-14"></path>
+</g>
+<path d="M1 0A1 1 0 1 1 1 -0.1A1 1 0 0 1 1 0" transform="matrix(2,0,0,2,90.5714,67.84)" fill="#fff" stroke="#337eb9" ecmeta_series_index="0" ecmeta_data_index="0" ecmeta_ssr_type="chart" class="zr2-cls-15"></path>
+<path d="M1 0A1 1 0 1 1 1 -0.1A1 1 0 0 1 1 0" transform="matrix(2,0,0,2,175.7143,66.0483)" fill="#fff" stroke="#337eb9" ecmeta_series_index="0" ecmeta_data_index="1" ecmeta_ssr_type="chart" class="zr2-cls-15"></path>
+<path d="M1 0A1 1 0 1 1 1 -0.1A1 1 0 0 1 1 0" transform="matrix(2,0,0,2,260.8571,66.8367)" fill="#fff" stroke="#337eb9" ecmeta_series_index="0" ecmeta_data_index="2" ecmeta_ssr_type="chart" class="zr2-cls-15"></path>
+<path d="M1 0A1 1 0 1 1 1 -0.1A1 1 0 0 1 1 0" transform="matrix(2,0,0,2,346,66.2633)" fill="#fff" stroke="#337eb9" ecmeta_series_index="0" ecmeta_data_index="3" ecmeta_ssr_type="chart" class="zr2-cls-15"></path>
+<path d="M1 0A1 1 0 1 1 1 -0.1A1 1 0 0 1 1 0" transform="matrix(2,0,0,2,431.1429,65.26)" fill="#fff" stroke="#337eb9" ecmeta_series_index="0" ecmeta_data_index="4" ecmeta_ssr_type="chart" class="zr2-cls-15"></path>
+<path d="M1 0A1 1 0 1 1 1 -0.1A1 1 0 0 1 1 0" transform="matrix(2,0,0,2,516.2857,65.475)" fill="#fff" stroke="#337eb9" ecmeta_series_index="0" ecmeta_data_index="5" ecmeta_ssr_type="chart" class="zr2-cls-15"></path>
+<path d="M1 0A1 1 0 1 1 1 -0.1A1 1 0 0 1 1 0" transform="matrix(2,0,0,2,601.4286,66.6933)" fill="#fff" stroke="#337eb9" ecmeta_series_index="0" ecmeta_data_index="6" ecmeta_ssr_type="chart" class="zr2-cls-15"></path>
+<path d="M1 0A1 1 0 1 1 1 -0.1A1 1 0 0 1 1 0" transform="matrix(2,0,0,2,90.5714,59.1683)" fill="#fff" stroke="#25978f" ecmeta_series_index="1" ecmeta_data_index="0" ecmeta_ssr_type="chart" class="zr2-cls-15"></path>
+<path d="M1 0A1 1 0 1 1 1 -0.1A1 1 0 0 1 1 0" transform="matrix(2,0,0,2,175.7143,59.9567)" fill="#fff" stroke="#25978f" ecmeta_series_index="1" ecmeta_data_index="1" ecmeta_ssr_type="chart" class="zr2-cls-15"></path>
+<path d="M1 0A1 1 0 1 1 1 -0.1A1 1 0 0 1 1 0" transform="matrix(2,0,0,2,260.8571,60.96)" fill="#fff" stroke="#25978f" ecmeta_series_index="1" ecmeta_data_index="2" ecmeta_ssr_type="chart" class="zr2-cls-15"></path>
+<path d="M1 0A1 1 0 1 1 1 -0.1A1 1 0 0 1 1 0" transform="matrix(2,0,0,2,346,44.9783)" fill="#fff" stroke="#25978f" ecmeta_series_index="1" ecmeta_data_index="3" ecmeta_ssr_type="chart" class="zr2-cls-15"></path>
+<path d="M1 0A1 1 0 1 1 1 -0.1A1 1 0 0 1 1 0" transform="matrix(2,0,0,2,431.1429,54.5817)" fill="#fff" stroke="#25978f" ecmeta_series_index="1" ecmeta_data_index="4" ecmeta_ssr_type="chart" class="zr2-cls-15"></path>
+<path d="M1 0A1 1 0 1 1 1 -0.1A1 1 0 0 1 1 0" transform="matrix(2,0,0,2,516.2857,52.145)" fill="#fff" stroke="#25978f" ecmeta_series_index="1" ecmeta_data_index="5" ecmeta_ssr_type="chart" class="zr2-cls-15"></path>
+<path d="M1 0A1 1 0 1 1 1 -0.1A1 1 0 0 1 1 0" transform="matrix(2,0,0,2,601.4286,53.9367)" fill="#fff" stroke="#25978f" ecmeta_series_index="1" ecmeta_data_index="6" ecmeta_ssr_type="chart" class="zr2-cls-15"></path>
+<path d="M1 0A1 1 0 1 1 1 -0.1A1 1 0 0 1 1 0" transform="matrix(2,0,0,2,90.5714,45.48)" fill="#fff" stroke="#74879d" ecmeta_series_index="2" ecmeta_data_index="0" ecmeta_ssr_type="chart" class="zr2-cls-15"></path>
+<path d="M1 0A1 1 0 1 1 1 -0.1A1 1 0 0 1 1 0" transform="matrix(2,0,0,2,175.7143,49.565)" fill="#fff" stroke="#74879d" ecmeta_series_index="2" ecmeta_data_index="1" ecmeta_ssr_type="chart" class="zr2-cls-15"></path>
+<path d="M1 0A1 1 0 1 1 1 -0.1A1 1 0 0 1 1 0" transform="matrix(2,0,0,2,260.8571,50.1383)" fill="#fff" stroke="#74879d" ecmeta_series_index="2" ecmeta_data_index="2" ecmeta_ssr_type="chart" class="zr2-cls-15"></path>
+<path d="M1 0A1 1 0 1 1 1 -0.1A1 1 0 0 1 1 0" transform="matrix(2,0,0,2,346,48.4183)" fill="#fff" stroke="#74879d" ecmeta_series_index="2" ecmeta_data_index="3" ecmeta_ssr_type="chart" class="zr2-cls-15"></path>
+<path d="M1 0A1 1 0 1 1 1 -0.1A1 1 0 0 1 1 0" transform="matrix(2,0,0,2,431.1429,52.145)" fill="#fff" stroke="#74879d" ecmeta_series_index="2" ecmeta_data_index="4" ecmeta_ssr_type="chart" class="zr2-cls-15"></path>
+<path d="M1 0A1 1 0 1 1 1 -0.1A1 1 0 0 1 1 0" transform="matrix(2,0,0,2,516.2857,49.4217)" fill="#fff" stroke="#74879d" ecmeta_series_index="2" ecmeta_data_index="5" ecmeta_ssr_type="chart" class="zr2-cls-15"></path>
+<path d="M1 0A1 1 0 1 1 1 -0.1A1 1 0 0 1 1 0" transform="matrix(2,0,0,2,601.4286,39.03)" fill="#fff" stroke="#74879d" ecmeta_series_index="2" ecmeta_data_index="6" ecmeta_ssr_type="chart" class="zr2-cls-15"></path>
+<path d="M-5 -5l133 0l0 20l-133 0Z" transform="translate(520 5)" fill="rgb(0,0,0)" fill-opacity="0" stroke="#b7b9be" stroke-width="0" class="zr2-cls-12"></path>
+<path d="M0 2.5L15 2.5" transform="translate(521 7.5)" fill="#000" stroke="#337eb9" stroke-width="2" stroke-linecap="butt" stroke-miterlimit="10" class="zr2-cls-12"></path>
+<path d="M9.5 2.5A2 2 0 1 1 9.5 2.3A2 2 0 0 1 9.5 2.5" transform="translate(521 7.5)" fill="#fff" stroke="#337eb9" stroke-width="2" stroke-linecap="butt" stroke-miterlimit="10" class="zr2-cls-12"></path>
+<text dominant-baseline="central" text-anchor="start" style="font-size:10px;font-family:Arial;" x="20" y="2.5" transform="translate(521 7.5)" fill="#54555a">C1</text>
+<path d="M-1 -2.5l33.8 0l0 10l-33.8 0Z" transform="translate(521 7.5)" fill="none" pointer-events="visible" ecmeta_series_index="0" ecmeta_data_index="0" ecmeta_ssr_type="legend" class="zr2-cls-16"></path>
+<path d="M0 2.5L15 2.5" transform="translate(562.8 7.5)" fill="#000" stroke="#25978f" stroke-width="2" stroke-linecap="butt" stroke-miterlimit="10" class="zr2-cls-12"></path>
+<path d="M9.5 2.5A2 2 0 1 1 9.5 2.3A2 2 0 0 1 9.5 2.5" transform="translate(562.8 7.5)" fill="#fff" stroke="#25978f" stroke-width="2" stroke-linecap="butt" stroke-miterlimit="10" class="zr2-cls-12"></path>
+<text dominant-baseline="central" text-anchor="start" style="font-size:10px;font-family:Arial;" x="20" y="2.5" transform="translate(562.8 7.5)" fill="#54555a">C5</text>
+<path d="M-1 -2.5l33.8 0l0 10l-33.8 0Z" transform="translate(562.8 7.5)" fill="none" pointer-events="visible" ecmeta_series_index="1" ecmeta_data_index="1" ecmeta_ssr_type="legend" class="zr2-cls-16"></path>
+<path d="M0 2.5L15 2.5" transform="translate(604.6 7.5)" fill="#000" stroke="#74879d" stroke-width="2" stroke-linecap="butt" stroke-miterlimit="10" class="zr2-cls-12"></path>
+<path d="M9.5 2.5A2 2 0 1 1 9.5 2.3A2 2 0 0 1 9.5 2.5" transform="translate(604.6 7.5)" fill="#fff" stroke="#74879d" stroke-width="2" stroke-linecap="butt" stroke-miterlimit="10" class="zr2-cls-12"></path>
+<text dominant-baseline="central" text-anchor="start" style="font-size:10px;font-family:Arial;" x="20" y="2.5" transform="translate(604.6 7.5)" fill="#54555a">C10</text>
+<path d="M-1 -2.5l39.4 0l0 10l-39.4 0Z" transform="translate(604.6 7.5)" fill="none" pointer-events="visible" ecmeta_series_index="2" ecmeta_data_index="2" ecmeta_ssr_type="legend" class="zr2-cls-16"></path>
+<defs >
+<clipPath id="zr2-c0">
+<path d="M47 29.2l599 0l0 87.6l-599 0Z" fill="#000" class="zr2-cls-13"></path>
+</clipPath>
+<clipPath id="zr2-c1">
+<path d="M47 29.2l599 0l0 87.6l-599 0Z" fill="#000" class="zr2-cls-13"></path>
+</clipPath>
+<clipPath id="zr2-c2">
+<path d="M47 29.2l599 0l0 87.6l-599 0Z" fill="#000" class="zr2-cls-13"></path>
+</clipPath>
+</defs>
+<style ><![CDATA[
+.zr2-cls-12:hover {
+pointer-events:none;
+}
+.zr2-cls-13:hover {
+cursor:pointer;
+fill:rgba(0,0,0,1);
+}
+.zr2-cls-14:hover {
+cursor:pointer;
+}
+.zr2-cls-15:hover {
+cursor:pointer;
+fill:rgba(255,255,255,1);
+}
+.zr2-cls-16:hover {
+cursor:pointer;
+fill:rgba(0,0,0,0);
+}
+
+]]>
+
+</style>
+</svg></figure>
+    <div class="note ">所有组合状态均为 completed；各组合结束原因为完成。协议完成不代表回答完整或答案正确。C1 / C5 / C10 的样本数分别为 3 / 15 / 30。</div>
+  </div><footer class="footer"><span>Qwen3.8-27B · 2026-09-09</span><span>07 / 12</span></footer></article><article class="sheet" aria-label="第 8 页：开启思考 · 输出与 Token"><header class="masthead"><div class="brand">InferPulse <span>Bench</span></div></header><h1>开启思考 · 输出与 Token</h1><p class="subtitle">区分单请求速率、聚合吞吐和服务端用量</p><div class="page-content">
+    <p class="lead">速率 tok/s；TPOT ms/Token。前两项依次列出 P50 / P95；四类 Token 均为 P50。</p>
+    <table class="double-line compact"><thead><tr><th scope="col">输入字符</th><th scope="col">并发</th><th scope="col">单请求速率<br>P50 / P95</th><th scope="col">TPOT<br>P50 / P95</th><th scope="col">聚合吞吐</th><th scope="col">输入<br>Token</th><th scope="col">输出<br>Token</th><th scope="col">思考<br>Token</th><th scope="col">缓存<br>Token</th></tr></thead><tbody><tr class="group-start"><td>1,024</td><td>1</td><td>848.47/851.01</td><td>1.18/1.18</td><td>677.31</td><td>100.00</td><td>18.00</td><td>6.00</td><td>N/A</td></tr><tr><td>1,024</td><td>5</td><td>848.57/925.58</td><td>1.18/1.20</td><td>3225.13</td><td>100.00</td><td>18.00</td><td>6.00</td><td>N/A</td></tr><tr><td>1,024</td><td>10</td><td>889.46/998.00</td><td>1.12/1.25</td><td>6013.88</td><td>100.00</td><td>18.00</td><td>6.00</td><td>N/A</td></tr><tr class="group-start"><td>2,048</td><td>1</td><td>844.99/951.83</td><td>1.18/1.19</td><td>696.60</td><td>100.00</td><td>18.00</td><td>6.00</td><td>N/A</td></tr><tr><td>2,048</td><td>5</td><td>889.55/1017.08</td><td>1.12/1.25</td><td>3253.41</td><td>100.00</td><td>18.00</td><td>6.00</td><td>N/A</td></tr><tr><td>2,048</td><td>10</td><td>877.69/969.76</td><td>1.13/1.21</td><td>6073.68</td><td>100.00</td><td>18.00</td><td>6.00</td><td>N/A</td></tr><tr class="group-start"><td>4,096</td><td>1</td><td>846.52/921.13</td><td>1.18/1.18</td><td>681.04</td><td>100.00</td><td>18.00</td><td>6.00</td><td>N/A</td></tr><tr><td>4,096</td><td>5</td><td>880.05/1032.15</td><td>1.14/1.23</td><td>3236.76</td><td>100.00</td><td>18.00</td><td>6.00</td><td>N/A</td></tr><tr><td>4,096</td><td>10</td><td>892.04/978.37</td><td>1.12/1.22</td><td>6057.77</td><td>100.00</td><td>18.00</td><td>6.00</td><td>N/A</td></tr><tr class="group-start"><td>8,192</td><td>1</td><td>846.82/847.32</td><td>1.18/1.18</td><td>667.58</td><td>100.00</td><td>18.00</td><td>6.00</td><td>N/A</td></tr><tr><td>8,192</td><td>5</td><td>876.16/899.58</td><td>1.14/1.22</td><td>3143.81</td><td>100.00</td><td>18.00</td><td>6.00</td><td>N/A</td></tr><tr><td>8,192</td><td>10</td><td>901.28/970.31</td><td>1.11/1.19</td><td>6212.08</td><td>100.00</td><td>18.00</td><td>6.00</td><td>N/A</td></tr><tr class="group-start"><td>16,384</td><td>1</td><td>848.85/917.00</td><td>1.18/1.18</td><td>679.45</td><td>100.00</td><td>18.00</td><td>6.00</td><td>N/A</td></tr><tr><td>16,384</td><td>5</td><td>870.40/1033.06</td><td>1.15/1.20</td><td>3177.68</td><td>100.00</td><td>18.00</td><td>6.00</td><td>N/A</td></tr><tr><td>16,384</td><td>10</td><td>890.96/1004.42</td><td>1.12/1.20</td><td>6204.19</td><td>100.00</td><td>18.00</td><td>6.00</td><td>N/A</td></tr><tr class="group-start"><td>32,768</td><td>1</td><td>846.24/848.22</td><td>1.18/1.18</td><td>665.21</td><td>100.00</td><td>18.00</td><td>6.00</td><td>N/A</td></tr><tr><td>32,768</td><td>5</td><td>848.57/1005.06</td><td>1.18/1.26</td><td>3100.36</td><td>100.00</td><td>18.00</td><td>6.00</td><td>N/A</td></tr><tr><td>32,768</td><td>10</td><td>879.30/971.18</td><td>1.13/1.20</td><td>6141.02</td><td>100.00</td><td>18.00</td><td>6.00</td><td>N/A</td></tr><tr class="group-start"><td>65,536</td><td>1</td><td>847.13/899.11</td><td>1.18/1.18</td><td>685.59</td><td>100.00</td><td>18.00</td><td>6.00</td><td>N/A</td></tr><tr><td>65,536</td><td>5</td><td>847.81/894.00</td><td>1.18/1.24</td><td>3172.73</td><td>100.00</td><td>18.00</td><td>6.00</td><td>N/A</td></tr><tr><td>65,536</td><td>10</td><td>890.99/970.05</td><td>1.12/1.20</td><td>5928.77</td><td>100.00</td><td>18.00</td><td>6.00</td><td>N/A</td></tr></tbody></table>
+    <figure><figcaption>开启思考 · 聚合输出吞吐随输入规模变化<span>横轴：字符；C：并发</span></figcaption><svg role="img" aria-label="开启思考 · 聚合输出吞吐随输入规模变化" width="660" height="150" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" version="1.1" baseProfile="full" viewBox="0 0 660 150">
+<rect width="660" height="150" x="0" y="0" fill="none"></rect>
+<path d="M48 116.5L644 116.5" fill="none" pointer-events="visible" stroke="#e9eff5" class="zr3-cls-17"></path>
+<path d="M48 94.5L644 94.5" fill="none" pointer-events="visible" stroke="#e9eff5" class="zr3-cls-17"></path>
+<path d="M48 73.5L644 73.5" fill="none" pointer-events="visible" stroke="#e9eff5" class="zr3-cls-17"></path>
+<path d="M48 51.5L644 51.5" fill="none" pointer-events="visible" stroke="#e9eff5" class="zr3-cls-17"></path>
+<path d="M48 30.5L644 30.5" fill="none" pointer-events="visible" stroke="#e9eff5" class="zr3-cls-17"></path>
+<text dominant-baseline="central" text-anchor="middle" style="font-size:10px;font-family:Arial;" y="-5" transform="translate(48 15)" fill="#415971">tok/s</text>
+<path d="M48 116.5L644 116.5" fill="none" pointer-events="visible" stroke="#ccd8e4" stroke-linecap="round" class="zr3-cls-17"></path>
+<text dominant-baseline="central" text-anchor="end" style="font-size:9px;font-family:Arial;" transform="translate(40 116)" fill="#54555a">0</text>
+<text dominant-baseline="central" text-anchor="end" style="font-size:9px;font-family:Arial;" transform="translate(40 94.5)" fill="#54555a">2,000</text>
+<text dominant-baseline="central" text-anchor="end" style="font-size:9px;font-family:Arial;" transform="translate(40 73)" fill="#54555a">4,000</text>
+<text dominant-baseline="central" text-anchor="end" style="font-size:9px;font-family:Arial;" transform="translate(40 51.5)" fill="#54555a">6,000</text>
+<text dominant-baseline="central" text-anchor="end" style="font-size:9px;font-family:Arial;" transform="translate(40 30)" fill="#54555a">8,000</text>
+<text dominant-baseline="central" text-anchor="middle" style="font-size:9px;font-family:Arial;" y="4.5" transform="translate(90.5714 124)" fill="#54555a">1,024</text>
+<text dominant-baseline="central" text-anchor="middle" style="font-size:9px;font-family:Arial;" y="4.5" transform="translate(175.7143 124)" fill="#54555a">2,048</text>
+<text dominant-baseline="central" text-anchor="middle" style="font-size:9px;font-family:Arial;" y="4.5" transform="translate(260.8571 124)" fill="#54555a">4,096</text>
+<text dominant-baseline="central" text-anchor="middle" style="font-size:9px;font-family:Arial;" y="4.5" transform="translate(346 124)" fill="#54555a">8,192</text>
+<text dominant-baseline="central" text-anchor="middle" style="font-size:9px;font-family:Arial;" y="4.5" transform="translate(431.1429 124)" fill="#54555a">16,384</text>
+<text dominant-baseline="central" text-anchor="middle" style="font-size:9px;font-family:Arial;" y="4.5" transform="translate(516.2857 124)" fill="#54555a">32,768</text>
+<text dominant-baseline="central" text-anchor="middle" style="font-size:9px;font-family:Arial;" y="4.5" transform="translate(601.4286 124)" fill="#54555a">65,536</text>
+<g clip-path="url(#zr3-c0)">
+<path d="M90.6 108.7L175.7 108.5L260.9 108.7L346 108.8L431.1 108.7L516.3 108.8L601.4 108.6" fill="none" pointer-events="visible" stroke="#337eb9" stroke-width="1.6" stroke-linejoin="bevel" class="zr3-cls-19"></path>
+</g>
+<g clip-path="url(#zr3-c1)">
+<path d="M90.6 81.3L175.7 81L260.9 81.2L346 82.2L431.1 81.8L516.3 82.7L601.4 81.9" fill="none" pointer-events="visible" stroke="#25978f" stroke-width="1.6" stroke-linejoin="bevel" class="zr3-cls-19"></path>
+</g>
+<g clip-path="url(#zr3-c2)">
+<path d="M90.6 51.4L175.7 50.7L260.9 50.9L346 49.2L431.1 49.3L516.3 50L601.4 52.3" fill="none" pointer-events="visible" stroke="#74879d" stroke-width="1.6" stroke-linejoin="bevel" class="zr3-cls-19"></path>
+</g>
+<path d="M1 0A1 1 0 1 1 1 -0.1A1 1 0 0 1 1 0" transform="matrix(2,0,0,2,90.5714,108.7189)" fill="#fff" stroke="#337eb9" ecmeta_series_index="0" ecmeta_data_index="0" ecmeta_ssr_type="chart" class="zr3-cls-20"></path>
+<path d="M1 0A1 1 0 1 1 1 -0.1A1 1 0 0 1 1 0" transform="matrix(2,0,0,2,175.7143,108.5116)" fill="#fff" stroke="#337eb9" ecmeta_series_index="0" ecmeta_data_index="1" ecmeta_ssr_type="chart" class="zr3-cls-20"></path>
+<path d="M1 0A1 1 0 1 1 1 -0.1A1 1 0 0 1 1 0" transform="matrix(2,0,0,2,260.8571,108.6788)" fill="#fff" stroke="#337eb9" ecmeta_series_index="0" ecmeta_data_index="2" ecmeta_ssr_type="chart" class="zr3-cls-20"></path>
+<path d="M1 0A1 1 0 1 1 1 -0.1A1 1 0 0 1 1 0" transform="matrix(2,0,0,2,346,108.8235)" fill="#fff" stroke="#337eb9" ecmeta_series_index="0" ecmeta_data_index="3" ecmeta_ssr_type="chart" class="zr3-cls-20"></path>
+<path d="M1 0A1 1 0 1 1 1 -0.1A1 1 0 0 1 1 0" transform="matrix(2,0,0,2,431.1429,108.6959)" fill="#fff" stroke="#337eb9" ecmeta_series_index="0" ecmeta_data_index="4" ecmeta_ssr_type="chart" class="zr3-cls-20"></path>
+<path d="M1 0A1 1 0 1 1 1 -0.1A1 1 0 0 1 1 0" transform="matrix(2,0,0,2,516.2857,108.849)" fill="#fff" stroke="#337eb9" ecmeta_series_index="0" ecmeta_data_index="5" ecmeta_ssr_type="chart" class="zr3-cls-20"></path>
+<path d="M1 0A1 1 0 1 1 1 -0.1A1 1 0 0 1 1 0" transform="matrix(2,0,0,2,601.4286,108.6299)" fill="#fff" stroke="#337eb9" ecmeta_series_index="0" ecmeta_data_index="6" ecmeta_ssr_type="chart" class="zr3-cls-20"></path>
+<path d="M1 0A1 1 0 1 1 1 -0.1A1 1 0 0 1 1 0" transform="matrix(2,0,0,2,90.5714,81.3298)" fill="#fff" stroke="#25978f" ecmeta_series_index="1" ecmeta_data_index="0" ecmeta_ssr_type="chart" class="zr3-cls-20"></path>
+<path d="M1 0A1 1 0 1 1 1 -0.1A1 1 0 0 1 1 0" transform="matrix(2,0,0,2,175.7143,81.0258)" fill="#fff" stroke="#25978f" ecmeta_series_index="1" ecmeta_data_index="1" ecmeta_ssr_type="chart" class="zr3-cls-20"></path>
+<path d="M1 0A1 1 0 1 1 1 -0.1A1 1 0 0 1 1 0" transform="matrix(2,0,0,2,260.8571,81.2048)" fill="#fff" stroke="#25978f" ecmeta_series_index="1" ecmeta_data_index="2" ecmeta_ssr_type="chart" class="zr3-cls-20"></path>
+<path d="M1 0A1 1 0 1 1 1 -0.1A1 1 0 0 1 1 0" transform="matrix(2,0,0,2,346,82.204)" fill="#fff" stroke="#25978f" ecmeta_series_index="1" ecmeta_data_index="3" ecmeta_ssr_type="chart" class="zr3-cls-20"></path>
+<path d="M1 0A1 1 0 1 1 1 -0.1A1 1 0 0 1 1 0" transform="matrix(2,0,0,2,431.1429,81.8399)" fill="#fff" stroke="#25978f" ecmeta_series_index="1" ecmeta_data_index="4" ecmeta_ssr_type="chart" class="zr3-cls-20"></path>
+<path d="M1 0A1 1 0 1 1 1 -0.1A1 1 0 0 1 1 0" transform="matrix(2,0,0,2,516.2857,82.6711)" fill="#fff" stroke="#25978f" ecmeta_series_index="1" ecmeta_data_index="5" ecmeta_ssr_type="chart" class="zr3-cls-20"></path>
+<path d="M1 0A1 1 0 1 1 1 -0.1A1 1 0 0 1 1 0" transform="matrix(2,0,0,2,601.4286,81.8932)" fill="#fff" stroke="#25978f" ecmeta_series_index="1" ecmeta_data_index="6" ecmeta_ssr_type="chart" class="zr3-cls-20"></path>
+<path d="M1 0A1 1 0 1 1 1 -0.1A1 1 0 0 1 1 0" transform="matrix(2,0,0,2,90.5714,51.3508)" fill="#fff" stroke="#74879d" ecmeta_series_index="2" ecmeta_data_index="0" ecmeta_ssr_type="chart" class="zr3-cls-20"></path>
+<path d="M1 0A1 1 0 1 1 1 -0.1A1 1 0 0 1 1 0" transform="matrix(2,0,0,2,175.7143,50.7079)" fill="#fff" stroke="#74879d" ecmeta_series_index="2" ecmeta_data_index="1" ecmeta_ssr_type="chart" class="zr3-cls-20"></path>
+<path d="M1 0A1 1 0 1 1 1 -0.1A1 1 0 0 1 1 0" transform="matrix(2,0,0,2,260.8571,50.879)" fill="#fff" stroke="#74879d" ecmeta_series_index="2" ecmeta_data_index="2" ecmeta_ssr_type="chart" class="zr3-cls-20"></path>
+<path d="M1 0A1 1 0 1 1 1 -0.1A1 1 0 0 1 1 0" transform="matrix(2,0,0,2,346,49.2201)" fill="#fff" stroke="#74879d" ecmeta_series_index="2" ecmeta_data_index="3" ecmeta_ssr_type="chart" class="zr3-cls-20"></path>
+<path d="M1 0A1 1 0 1 1 1 -0.1A1 1 0 0 1 1 0" transform="matrix(2,0,0,2,431.1429,49.305)" fill="#fff" stroke="#74879d" ecmeta_series_index="2" ecmeta_data_index="4" ecmeta_ssr_type="chart" class="zr3-cls-20"></path>
+<path d="M1 0A1 1 0 1 1 1 -0.1A1 1 0 0 1 1 0" transform="matrix(2,0,0,2,516.2857,49.984)" fill="#fff" stroke="#74879d" ecmeta_series_index="2" ecmeta_data_index="5" ecmeta_ssr_type="chart" class="zr3-cls-20"></path>
+<path d="M1 0A1 1 0 1 1 1 -0.1A1 1 0 0 1 1 0" transform="matrix(2,0,0,2,601.4286,52.2657)" fill="#fff" stroke="#74879d" ecmeta_series_index="2" ecmeta_data_index="6" ecmeta_ssr_type="chart" class="zr3-cls-20"></path>
+<path d="M-5 -5l133 0l0 20l-133 0Z" transform="translate(520 5)" fill="rgb(0,0,0)" fill-opacity="0" stroke="#b7b9be" stroke-width="0" class="zr3-cls-17"></path>
+<path d="M0 2.5L15 2.5" transform="translate(521 7.5)" fill="#000" stroke="#337eb9" stroke-width="2" stroke-linecap="butt" stroke-miterlimit="10" class="zr3-cls-17"></path>
+<path d="M9.5 2.5A2 2 0 1 1 9.5 2.3A2 2 0 0 1 9.5 2.5" transform="translate(521 7.5)" fill="#fff" stroke="#337eb9" stroke-width="2" stroke-linecap="butt" stroke-miterlimit="10" class="zr3-cls-17"></path>
+<text dominant-baseline="central" text-anchor="start" style="font-size:10px;font-family:Arial;" x="20" y="2.5" transform="translate(521 7.5)" fill="#54555a">C1</text>
+<path d="M-1 -2.5l33.8 0l0 10l-33.8 0Z" transform="translate(521 7.5)" fill="none" pointer-events="visible" ecmeta_series_index="0" ecmeta_data_index="0" ecmeta_ssr_type="legend" class="zr3-cls-21"></path>
+<path d="M0 2.5L15 2.5" transform="translate(562.8 7.5)" fill="#000" stroke="#25978f" stroke-width="2" stroke-linecap="butt" stroke-miterlimit="10" class="zr3-cls-17"></path>
+<path d="M9.5 2.5A2 2 0 1 1 9.5 2.3A2 2 0 0 1 9.5 2.5" transform="translate(562.8 7.5)" fill="#fff" stroke="#25978f" stroke-width="2" stroke-linecap="butt" stroke-miterlimit="10" class="zr3-cls-17"></path>
+<text dominant-baseline="central" text-anchor="start" style="font-size:10px;font-family:Arial;" x="20" y="2.5" transform="translate(562.8 7.5)" fill="#54555a">C5</text>
+<path d="M-1 -2.5l33.8 0l0 10l-33.8 0Z" transform="translate(562.8 7.5)" fill="none" pointer-events="visible" ecmeta_series_index="1" ecmeta_data_index="1" ecmeta_ssr_type="legend" class="zr3-cls-21"></path>
+<path d="M0 2.5L15 2.5" transform="translate(604.6 7.5)" fill="#000" stroke="#74879d" stroke-width="2" stroke-linecap="butt" stroke-miterlimit="10" class="zr3-cls-17"></path>
+<path d="M9.5 2.5A2 2 0 1 1 9.5 2.3A2 2 0 0 1 9.5 2.5" transform="translate(604.6 7.5)" fill="#fff" stroke="#74879d" stroke-width="2" stroke-linecap="butt" stroke-miterlimit="10" class="zr3-cls-17"></path>
+<text dominant-baseline="central" text-anchor="start" style="font-size:10px;font-family:Arial;" x="20" y="2.5" transform="translate(604.6 7.5)" fill="#54555a">C10</text>
+<path d="M-1 -2.5l39.4 0l0 10l-39.4 0Z" transform="translate(604.6 7.5)" fill="none" pointer-events="visible" ecmeta_series_index="2" ecmeta_data_index="2" ecmeta_ssr_type="legend" class="zr3-cls-21"></path>
+<defs >
+<clipPath id="zr3-c0">
+<path d="M47 29.2l599 0l0 87.6l-599 0Z" fill="#000" class="zr3-cls-18"></path>
+</clipPath>
+<clipPath id="zr3-c1">
+<path d="M47 29.2l599 0l0 87.6l-599 0Z" fill="#000" class="zr3-cls-18"></path>
+</clipPath>
+<clipPath id="zr3-c2">
+<path d="M47 29.2l599 0l0 87.6l-599 0Z" fill="#000" class="zr3-cls-18"></path>
+</clipPath>
+</defs>
+<style ><![CDATA[
+.zr3-cls-17:hover {
+pointer-events:none;
+}
+.zr3-cls-18:hover {
+cursor:pointer;
+fill:rgba(0,0,0,1);
+}
+.zr3-cls-19:hover {
+cursor:pointer;
+}
+.zr3-cls-20:hover {
+cursor:pointer;
+fill:rgba(255,255,255,1);
+}
+.zr3-cls-21:hover {
+cursor:pointer;
+fill:rgba(0,0,0,0);
+}
+
+]]>
+
+</style>
+</svg></figure>
+    <div class="note ">聚合吞吐是组合层级结果，没有 P50 / P95。缓存 Token 为 N/A 表示缺少观测，不表示缓存为零。输入字符数与实际输入 Token 分开展示。</div>
+  </div><footer class="footer"><span>Qwen3.8-27B · 2026-09-09</span><span>08 / 12</span></footer></article><article class="sheet" aria-label="第 9 页：开启思考 · 证据完整性"><header class="masthead"><div class="brand">InferPulse <span>Bench</span></div></header><h1>开启思考 · 证据完整性</h1><p class="subtitle">失败、未知、截断与不可计算值均保留</p><div class="page-content">
+    <table class="evidence-table"><thead><tr><th scope="col">输入字符</th><th scope="col">并发</th><th scope="col">usage 覆盖</th><th scope="col">最终回答 / 未知</th><th scope="col">截断</th><th scope="col">速率有效样本</th><th scope="col">失败或跳过原因</th></tr></thead><tbody><tr class="group-start"><td>1,024</td><td>1</td><td>100.0%</td><td>3/0</td><td>0</td><td>3</td><td>—</td></tr><tr><td>1,024</td><td>5</td><td>100.0%</td><td>15/0</td><td>0</td><td>15</td><td>—</td></tr><tr><td>1,024</td><td>10</td><td>100.0%</td><td>30/0</td><td>0</td><td>30</td><td>—</td></tr><tr class="group-start"><td>2,048</td><td>1</td><td>100.0%</td><td>3/0</td><td>0</td><td>3</td><td>—</td></tr><tr><td>2,048</td><td>5</td><td>100.0%</td><td>15/0</td><td>0</td><td>15</td><td>—</td></tr><tr><td>2,048</td><td>10</td><td>100.0%</td><td>30/0</td><td>0</td><td>30</td><td>—</td></tr><tr class="group-start"><td>4,096</td><td>1</td><td>100.0%</td><td>3/0</td><td>0</td><td>3</td><td>—</td></tr><tr><td>4,096</td><td>5</td><td>100.0%</td><td>15/0</td><td>0</td><td>15</td><td>—</td></tr><tr><td>4,096</td><td>10</td><td>100.0%</td><td>30/0</td><td>0</td><td>30</td><td>—</td></tr><tr class="group-start"><td>8,192</td><td>1</td><td>100.0%</td><td>3/0</td><td>0</td><td>3</td><td>—</td></tr><tr><td>8,192</td><td>5</td><td>100.0%</td><td>15/0</td><td>0</td><td>15</td><td>—</td></tr><tr><td>8,192</td><td>10</td><td>100.0%</td><td>30/0</td><td>0</td><td>30</td><td>—</td></tr><tr class="group-start"><td>16,384</td><td>1</td><td>100.0%</td><td>3/0</td><td>0</td><td>3</td><td>—</td></tr><tr><td>16,384</td><td>5</td><td>100.0%</td><td>15/0</td><td>0</td><td>15</td><td>—</td></tr><tr><td>16,384</td><td>10</td><td>100.0%</td><td>30/0</td><td>0</td><td>30</td><td>—</td></tr><tr class="group-start"><td>32,768</td><td>1</td><td>100.0%</td><td>3/0</td><td>0</td><td>3</td><td>—</td></tr><tr><td>32,768</td><td>5</td><td>100.0%</td><td>15/0</td><td>0</td><td>15</td><td>—</td></tr><tr><td>32,768</td><td>10</td><td>100.0%</td><td>30/0</td><td>0</td><td>30</td><td>—</td></tr><tr class="group-start"><td>65,536</td><td>1</td><td>100.0%</td><td>3/0</td><td>0</td><td>3</td><td>—</td></tr><tr><td>65,536</td><td>5</td><td>100.0%</td><td>15/0</td><td>0</td><td>15</td><td>—</td></tr><tr><td>65,536</td><td>10</td><td>100.0%</td><td>30/0</td><td>0</td><td>30</td><td>—</td></tr></tbody></table>
+    <h2>最高全部请求成功的已测并发</h2>
+    <table class="envelope"><thead><tr><th scope="col">输入字符</th><th scope="col">1,024</th><th scope="col">2,048</th><th scope="col">4,096</th><th scope="col">8,192</th><th scope="col">16,384</th><th scope="col">32,768</th><th scope="col">65,536</th></tr></thead><tbody><tr class="group-start"><td>已测并发</td><td>10</td><td>10</td><td>10</td><td>10</td><td>10</td><td>10</td><td>10</td></tr></tbody></table>
+    <div class="note ">本次每档最高全部成功并发为 10，仅描述已测范围。它不是服务的绝对上限，也不是 SLA 或稳定容量结论。</div>
+    <div class="two explanations"><section><h3>已观测的完整性</h3><p>本次所有性能请求均有 usage 和可识别最终回答，未记录截断或未决请求。</p></section><section><h3>模式验证</h3><p>参数被接受；已观测到思考内容或思考 Token。不能仅以 HTTP 200 判断模式生效。</p></section></div>
+  </div><footer class="footer"><span>Qwen3.8-27B · 2026-09-09</span><span>09 / 12</span></footer></article><article class="sheet" aria-label="第 10 页：性能变化分析"><header class="masthead"><div class="brand">InferPulse <span>Bench</span></div></header><h1>性能变化分析</h1><p class="subtitle">关注点 A · 关闭思考 · 并发 10 · 输出预算 512 Token</p><div class="page-content">
+  <div class="finding"><span class="finding-label">局部劣化 · 待复测</span><h2>32,768 字符档出现延迟抬升与吞吐回落</h2><p>相邻已测区间：16,384 → 32,768 字符。后续 65,536 字符档恢复，当前不能认定为持续劣化转折点。</p></div>
+  <div class="turn-stats"><section><span>TTFT P95</span><strong>+44.9%</strong><small>8.69 → 12.59 ms</small></section><section><span>E2E P95</span><strong>+20.8%</strong><small>20.99 → 25.35 ms</small></section><section><span>聚合输出吞吐</span><strong>-19.9%</strong><small>5,646.52 → 4,521.46 tok/s</small></section></div>
+  <h2>前一档、关注点与后一档一起看</h2>
+  <table class="turn-table"><thead><tr><th scope="col">输入字符</th><th scope="col">TTFT P95<br>ms</th><th scope="col">E2E P95<br>ms</th><th scope="col">聚合吞吐<br>tok/s</th><th scope="col">成功 / 发起</th></tr></thead><tbody><tr class="group-start"><td>16,384</td><td>8.69</td><td>20.99</td><td>5,646.52</td><td>30 / 30</td></tr><tr><td>32,768</td><td>12.59</td><td>25.35</td><td>4,521.46</td><td>30 / 30</td></tr><tr><td>65,536</td><td>9.74</td><td>22.10</td><td>5,498.21</td><td>30 / 30</td></tr></tbody></table>
+  <p class="lead">数据来自第 4–6 页。变化率 =（关注点 − 前一档）/ 前一档；仅比较相同模式、并发与输出预算。</p>
+  <h2><span>01</span> 已观测到什么</h2>
+  <p>关闭思考、并发 10 时，输入从 16,384 增至 32,768 字符，TTFT P95 由 8.69 升至 12.59 ms（增加 3.90 ms，+44.9%），E2E P95 上升 20.8%，聚合吞吐下降 19.9%。这表示该已测点的尾部响应更慢、单位时间总产出减少；成功率仍为 100%。但单请求输出速率 P50 从 880.54 升至 917.64 tok/s，不能概括成所有指标都变差。</p>
+  <h2><span>02</span> 为什么暂不称为持续拐点</h2>
+  <p>下一档 TTFT P95 回落至 9.74 ms，聚合吞吐回升至 5,498.21 tok/s。当前只看到一个局部低谷。每档仅 30 次请求、3 轮；没有逐轮波动分析或独立重复运行验证，不能声称统计显著。即便后续证据支持转折，也只能定位在相邻已测区间内，不能断言精确阈值。</p>
+  <h2><span>03</span> 对使用与复测的含义</h2>
+  <p>如果业务常用约 32K 字符、并发 10，应优先复测该区间及两侧档位，增加独立重复运行，并核对实际输出长度、缓存、超时与失败情况。结合服务端和客户端监控定位原因；现有客户端汇总数据无法区分网络、调度与模型计算影响。</p>
+  <div class="note warm"><b>分析边界。</b>以上结论仅覆盖本次已测条件；尚无独立重复运行验证。多项指标共同变化不等于已确定原因，也不能直接用于推断容量上限。</div>
+</div><footer class="footer"><span>Qwen3.8-27B · 2026-09-09</span><span>10 / 12</span></footer></article><article class="sheet" aria-label="第 11 页：模型自评"><header class="masthead"><div class="brand">InferPulse <span>Bench</span></div></header><h1>模型自评</h1><p class="subtitle">让模型说说，这一轮表现如何</p><div class="page-content">
+  <div class="review-rating"><div><span class="review-eyebrow">综合档位</span><strong>人上人</strong></div><p>模型主观自评<br><span>仅限本次已测范围 · 不构成排名或认证</span></p></div>
+  <div class="note ">依据本次汇总数据生成，未经事实核验。自评不计入性能统计，不改变运行状态。</div>
+  <div class="review-body"><section><h2><span>01</span>表现较好的已测场景</h2><p>在本次测试中，我完成了两种模式、7 档输入字符数与 3 档并发的全部 42 个组合，672 次性能请求均在协议层面完成。以 1,024 字符、并发 1 为例，关闭思考的 TTFT P50 为 6.81 ms、单请求输出速率 P50 为 875.79 tok/s。在这一已测场景下，我的首段响应较快，协议完成情况良好。不过实际输出较短，且单并发仅有 3 个样本，这些表现还不能代表长回答或长时间运行的结果。</p></section><section><h2><span>02</span>输入与并发带来的压力</h2><p>我会特别关注前页指出的局部劣化：关闭思考、并发 10，从 16,384 到 32,768 字符，TTFT P95 从 8.69 升至 12.59 ms（+44.9%），聚合吞吐从 5,646.52 降至 4,521.46 tok/s（−19.9%）。这意味着该点的尾部响应更慢、单位时间总产出减少。不过单请求输出速率没有同步下降，65,536 字符档的尾延迟和聚合吞吐又恢复，不能据此宣称出现持续容量拐点。每档仅 30 次请求、3 轮，应先复测相邻区间，再判断变化是否稳定重现；客户端汇总数据也不足以定位硬件瓶颈。</p></section><section><h2><span>03</span>思考模式的时间与预算代价</h2><p>在相同的 1,024 字符、并发 1 条件下，开启思考的 TTFT P50 为 6.60 ms，而 TTFO P50 为 14.09 ms；关闭思考两项均为 6.81 ms。首段语义文本较早出现，不等于最终回答也同样早到达。同时，两模式输出预算为 512 与 4,096 Token，实际 completion_tokens 的 P50 分别为 12 与 18，不能把所有差异归因于思考开关。未观测到关闭模式的思考内容，也不等于已经证明思考彻底关闭。</p></section><section><h2><span>04</span>使用建议与证据限制</h2><p>后续我建议先围绕实际业务的输入长度与目标并发补充样本，再共同观察 TTFO、E2E 尾延迟、截断和最终回答完整性。交互场景关注用户多久能看到最终回答，批处理场景则更关注聚合吞吐及完成情况。本次测试没有业务 SLA、长时间稳定性测试或硬件监控，因此不能给出生产容量承诺。我给出的档位是基于本次已测范围的主观评价，没有量化评分阈值，也不构成跨模型排名。</p></section></div>
+  <div class="review-meta"><b>自评请求信息</b><p>被测模型根据本次汇总结果独立生成；关闭思考，输出上限 2,048 Token。评语未经事实核验，不计入性能统计，不改变运行状态。</p></div>
+
+</div><footer class="footer"><span>Qwen3.8-27B · 2026-09-09</span><span>11 / 12</span></footer></article><article class="sheet" aria-label="第 12 页：测量口径与附录"><header class="masthead"><div class="brand">InferPulse <span>Bench</span></div></header><h1>测量口径与附录</h1><p class="subtitle">定义、来源与缺失信息一起交付</p><div class="page-content">
+  <h2>测量口径与限制</h2><ol class="methods"><li>TTFT 包括可识别的思考文本；TTFO 是首个可识别的最终回答。只有思考、没有最终回答或无法区分时，TTFO 为 N/A。</li><li>所有耗时来自客户端单调时钟，包括连接、网络、网关、排队与处理；不是服务端纯计算时间。预检、生成材料、序列化与落盘不计入性能窗口。</li><li>各组合测量窗口为每批最早请求发起至最后请求结束的时长之和；失败耗时保留在分母。</li><li>单请求输出 tok/s = (服务输出 Token − 1) / 首末语义文本间隔（秒）；TPOT 为其倒数，以 ms/Token 表示。尾部 usage 和结束标记不延长生成时间。</li><li>聚合输出 tok/s = 成功请求输出 Token 总数 / 组合测量窗口；任一成功请求缺少输出 usage 或存在未决请求时为 N/A。</li><li>Token 仅采用服务 usage；字符数与 SSE 分块数不是 Token 数。completion_tokens 按服务口径展示，不能直接称为最终回答 Token。</li><li>单块输出、少于 2 Token、零生成间隔或缺失 usage 时单请求速率为 N/A。思考被服务隐藏时，客户端无法完整观测生成过程。</li><li>分布只包含成功且指标可计算的请求；P50/P95 使用 nearest-rank。默认单并发只有 3 个样本，尾延迟参考性有限。</li><li>达到输出上限可属于协议成功；截断、最终回答缺失和未知分别保留。最高成功并发不代表绝对容量或模式已经验证。</li><li>请求使用不同前缀，但不能强制关闭服务端缓存。固定执行顺序、不同输出预算和服务默认参数也可能影响对照。</li><li>N/A 表示缺少计算所需的完整观测，不表示 0；原始状态和原因保存在 requests.jsonl，分布样本数保存在 summary.json。</li></ol>
+  <div class="two"><section><h3>预检与预热</h3><p>两种模式各执行 1 次预检，HTTP 200、无错误。本次未启用独立预热；预检不计入性能统计。</p><p>思考参数：<code>chat_template_kwargs.enable_thinking</code>，分别使用 false / true。</p></section><section><h3>自评与统计隔离</h3><p>模型自评使用独立请求，关闭思考，输出上限 2,048 Token；不计入性能请求数、耗时分布或吞吐窗口。</p><p>档位与评语属于模型主观意见，不能替代原始证据核验。</p></section></div>
+  <h3>运行与追溯信息</h3><p class="source">模型：Qwen3.8-27B<br>Run：7c0816fbca63b913af909e13<br>开始时间（UTC）：2026-09-09T05:59:49.642220+00:00<br>指标来源：客户端请求时序与服务端 usage；计算口径见本页。<br>核验材料：运行配置快照、请求级记录、汇总结果与自评记录应随报告一并归档。</p>
+  <div class="support"><b>支持 InferPulse Bench</b><p>如果工具对你有帮助，欢迎请作者喝一杯瑞幸咖啡。支持全凭自愿，不影响任何功能。</p><a href="https://gitee.com/xum1983/inferpulse-bench/blob/master/SPONSOR.md">gitee.com/xum1983/inferpulse-bench/blob/master/SPONSOR.md</a></div>
+</div><footer class="footer"><span>Qwen3.8-27B · 2026-09-09</span><span>12 / 12</span></footer></article></main></body></html>
