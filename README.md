@@ -4,9 +4,9 @@
 
 面向内网部署与交付场景的轻量大模型性能测试工具。填写模型连接信息，自动完成思考模式核验、分档测试，并生成可复核的中文报告。
 
-**源码版本：1.8.0 · Python 3.9+ · 零第三方依赖 · MIT**
+**源码版本：1.9.0 · Python 3.9+ · 零第三方依赖 · MIT**
 
-[下载运行包](https://gitee.com/xum1983/inferpulse-bench/releases/tag/v1.8.0) · [Markdown 报告示例](report.example.md) · [HTML 报告](report.example.html) · [PDF 报告](report.example.pdf) · [详细使用说明](使用说明.md) · [反馈与贡献](CONTRIBUTING.md) · [☕ 支持作者](SPONSOR.md)
+[下载运行包](https://gitee.com/xum1983/inferpulse-bench/releases/tag/v1.9.0) · [Markdown 报告示例](https://gitee.com/xum1983/inferpulse-bench/blob/master/report.example.md) · [HTML 报告](https://gitee.com/xum1983/inferpulse-bench/blob/master/report.example.html) · [PDF 报告](https://gitee.com/xum1983/inferpulse-bench/blob/master/report.example.pdf) · [详细使用说明](使用说明.md) · [反馈与贡献](https://gitee.com/xum1983/inferpulse-bench/blob/master/CONTRIBUTING.md) · [☕ 支持作者](https://gitee.com/xum1983/inferpulse-bench/blob/master/SPONSOR.md)
 
 ## 产品与仓库定位
 
@@ -17,19 +17,34 @@ InferPulse 是 AI 模型服务性能与容量测试产品的统一名称。本�
 | **InferPulse Bench** | `inferpulse-bench` | 本仓库；独立 Python 脚本，通过配置文件运行，生成中文报告 |
 | **InferPulse** | [`inferpulse`](https://gitee.com/xum1983/inferpulse) | 带图形界面的完整产品；已建立占位仓库，代码与安装包尚未公开发布 |
 
-两者分别管理版本、下载包和发布记录。Bench 当前源码版本为 1.8.0，不代表图形界面产品的版本或发布状态；配置和证据格式目前不能直接互换。MIT 许可适用于本仓库内容，完整产品的许可将在其发布时单独说明。
+两者分别管理版本、下载包和发布记录。Bench 当前源码版本为 1.9.0，不代表图形界面产品的版本或发布状态；配置和证据格式目前不能直接互换。MIT 许可适用于本仓库内容，完整产品的许可将在其发布时单独说明。
 
-源码与运行包版本均为 1.8.0，包含部署别名的思考参数选择及报告末尾支持链接。默认测试矩阵和指标口径保持一致。
+源码与运行包版本均为 1.9.0，默认同时生成 Markdown 与 HTML 报告，可在 JSONC 中逐行注释关闭一种格式。默认测试矩阵和指标口径保持一致。
 
 ## HTML / PDF 报告预览
 
-[下载 HTML](report.example.html) · [查看 PDF](report.example.pdf)
+[下载 HTML](https://gitee.com/xum1983/inferpulse-bench/blob/master/report.example.html) · [查看 PDF](https://gitee.com/xum1983/inferpulse-bench/blob/master/report.example.pdf)
 
 下载 HTML 后直接用浏览器打开，无需联网或安装依赖；支持 A4 纵向打印及保存为 PDF。报告采用浅色版式，全部内容平铺，包含双模式对照、性能变化分析、模型自评和末尾附录，共 12 页。打印时使用 100% 比例，并关闭浏览器额外页眉页脚。
 
-![报告首页](report.preview.png)
+![报告首页](https://gitee.com/xum1983/inferpulse-bench/raw/master/report.preview.png)
 
-当前文件用于评估报告版式与阅读效果，使用合成数据及自评文案，不代表真实模型成绩。HTML 生成与配置切换尚未接入 1.8.0，现有命令行仍输出 Markdown；本次不变更程序版本或运行包。
+上述 12 页文件是固定样本的设计原型，使用合成数据及自评文案，不代表真实模型成绩。1.9.0 已实现动态 HTML 与格式配置；动态版从本次运行数据生成可流动表格，不固定页数，图表尚未接入。动态版采用 A4 打印样式，实际长表及长自评分页仍待浏览器视觉验收，不能把原型打印结果作为动态版验收结论。
+
+## 报告格式
+
+1.9.0 默认同时生成两种格式。用 JSONC 注释关闭不需要的行，至少保留一项：
+
+```jsonc
+"report_formats": [
+  "md",       // 注释此行可关闭 Markdown
+  "html",     // 注释此行可关闭 HTML
+],
+```
+
+仅支持小写 `md` / `html`，不能重复或全部关闭；省略整个字段仍使用双格式默认值。已有配置不会被覆盖，可手动加入此字段，`--dry-run` 显示生效选择。证据目录保存启用格式的 `report.md` / `report.html` 副本。离线重建沿用快照中的选择，不读取修改后的当前配置；1.9.0 前未记录格式的旧快照保持只生成 Markdown，不删除已有文件。
+
+HTML 无远程资源或额外运行依赖，内容平铺，自评位于最后的测量口径与附录之前；支持浏览器打印为 PDF，配置不接受 `pdf`。两种格式来自同一汇总，不增加模型请求。变化分析列出满足相邻档筛选规则的劣化及文字解释；20% 变化仅作为描述性关注阈值，不是容量、SLA 或统计显著性判定。
 
 ## 快速开始
 
@@ -49,7 +64,7 @@ python3 llm_benchmark.py
 
 Windows 可将 `python3` 改为 `python`。如果没有配置文件，首次运行会自动创建模板并退出，填写后再次运行即可。
 
-报告生成在脚本旁：`llm_benchmark_report_日期-时间-随机标识.md`。详细操作见 [使用说明](使用说明.md)。
+默认在脚本旁生成 `llm_benchmark_report_日期-时间-随机标识.md` 和同名 `.html`。详细操作见 [使用说明](使用说明.md)。
 
 ### 先做一次小规模试跑
 
@@ -168,9 +183,9 @@ JSONC 支持 `//`、`/* … */` 注释和末尾逗号。数组至少保留一项
 python3 llm_benchmark.py report --input llm_benchmark_evidence_日期-时间-随机标识
 ```
 
-证据目录包含 `snapshot.json`、`requests.jsonl`、`summary.json` 和 `report.md`；启用自评时另有 `self_review.json`。重建根据快照和请求证据复算，不使用当前模型配置，不重发自评请求，也不续跑未完成的压测。
+证据目录包含 `snapshot.json`、`requests.jsonl`、`summary.json` 和启用格式的 `report.md` / `report.html`；启用自评时另有 `self_review.json`。重建根据快照和请求证据复算，不使用当前模型配置，不重发自评请求，也不续跑未完成的压测。
 
-1.7.1 的报告末尾包含一段自愿支持说明，链接到 [支持作者页面](SPONSOR.md)。该段位于数据说明及模型自评之后；生成与离线重建不访问链接，不改变模型请求或机器证据。支持完全自愿，不影响任何功能的使用。
+1.7.1 的报告末尾包含一段自愿支持说明，链接到 [支持作者页面](https://gitee.com/xum1983/inferpulse-bench/blob/master/SPONSOR.md)。该段位于数据说明及模型自评之后；生成与离线重建不访问链接，不改变模型请求或机器证据。支持完全自愿，不影响任何功能的使用。
 
 ## 常见问题
 
@@ -189,7 +204,7 @@ python3 llm_benchmark.py report --input llm_benchmark_evidence_日期-时间-随
 
 ## 反馈与许可
 
-欢迎通过 [Issues](https://gitee.com/xum1983/inferpulse-bench/issues) 反馈问题，通过 Pull Request 改进文档和代码。复现信息与贡献约定见 [反馈与贡献指南](CONTRIBUTING.md)。
+欢迎通过 [Issues](https://gitee.com/xum1983/inferpulse-bench/issues) 反馈问题，通过 Pull Request 改进文档和代码。复现信息与贡献约定见 [反馈与贡献指南](https://gitee.com/xum1983/inferpulse-bench/blob/master/CONTRIBUTING.md)。
 
 Author: William Xu  
 Email: xum1983@gmail.com  
