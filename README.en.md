@@ -8,7 +8,7 @@ Measure first-response latency, generation speed, concurrency and long-context b
 
 **Python 3.9+ · Standard-library-only runtime · MIT · Author: William Xu**
 
-[Download stable 1.9.0](https://github.com/Siriuser/inferpulse-bench/releases/tag/v1.9.0) · [Try 1.10.0 Agent preview](https://github.com/Siriuser/inferpulse-bench/releases/tag/v1.10.0) · [Usage guide (Chinese)](使用说明.md) · [Report an issue](https://github.com/Siriuser/inferpulse-bench/issues)
+[Download 1.10.1 (GitHub)](https://github.com/Siriuser/inferpulse-bench/releases/tag/v1.10.1) · [Download 1.10.1 (Gitee)](https://gitee.com/xum1983/inferpulse-bench/releases/tag/v1.10.1) · [Usage guide (Chinese)](使用说明.md) · [Report an issue](https://github.com/Siriuser/inferpulse-bench/issues)
 
 ## What it measures
 
@@ -17,10 +17,10 @@ Measure first-response latency, generation speed, concurrency and long-context b
 | Baseline performance | TTFT, TTFO, request latency, per-request and aggregate tokens/s, server-reported token usage |
 | Long context and concurrency | Input-character × concurrency × thinking-mode matrix, P50/P95, failures, truncation and degradation analysis |
 | Thinking comparison | Parameter acceptance, observable mode evidence and off/on comparisons using Qwen- or DeepSeek-compatible parameter schemes |
-| Agent performance (1.10.0) | Same-run baseline references, additional long-context cases, concurrent fixed-tool loops, per-turn tool readiness, session latency and optional PNG/WAV input |
+| Agent performance (1.10.1) | Same-run baseline references, additional long-context cases, concurrent fixed-tool loops, per-turn tool readiness, session latency and optional PNG/WAV input |
 | Reports and evidence | Markdown and HTML, A4/PDF printing, offline reconstruction and optional model-written self-review |
 
-The Agent suite is opt-in and does not require thinking mode. Measurements and deterministic conclusions appear in a separate report section. Flow completion does not establish task correctness. Current source is the 1.10.0 prerelease; the stable release is 1.9.0, also available on Gitee.
+The Agent suite is opt-in and does not require thinking mode. Measurements and deterministic conclusions appear in a separate report section. Flow completion does not establish task correctness. Current version: 1.10.1.
 
 ## Quick start
 
@@ -73,6 +73,8 @@ Add this top-level block to your existing JSONC:
 
 Defaults cover 8192 / 32768 / 65536 / 131072 input characters and fixed-tool sessions of ten model calls. Matching single-request baseline measurements are referenced within the same run; missing cases are measured separately. Loops and multimodal inputs always require dedicated measurements. With both modes and the default baseline matrix, the suite adds at most 1084 model requests including preparation. Inspect `--dry-run` and reduce the matrix for a first trial.
 
+`loop.tool_choice` defaults to `named` (the fixed function); select `auto` explicitly when needed. There is no automatic fallback. Version 1.10.1 uses strict required arguments, explicit final-answer instructions and output-budget checks before executing a valid tool call.
+
 Reports include per-turn data, thinking comparisons, descriptive 20% degradation flags and optional user-defined target checks. Missing usage or unresolved timing windows do not produce fabricated throughput. Tool arguments are not treated as final answers, and model-generated commands or external tools are never executed.
 
 [Detailed Agent configuration and metrics (Chinese)](docs/AGENT_PERFORMANCE.md)
@@ -83,7 +85,7 @@ Reports include per-turn data, thinking comparisons, descriptive 20% degradation
 
 ![Report preview](report.preview.png)
 
-The examples are a 12-page design prototype using synthetic data, not model performance results. Generated report length depends on actual measurements. A dynamic 1.10.0 Agent report passed Chrome A4 long-table layout inspection. Inline SVG charts and styles require no external resources. Print in A4 portrait at 100% scale with browser headers and footers disabled.
+The examples are a 12-page design prototype using synthetic data, not model performance results. Generated report length depends on actual measurements. Dynamic 1.10.1 Agent reports passed Chrome A4 inspection, including long tables and real failure results. Inline SVG charts and styles require no external resources. Print in A4 portrait at 100% scale with browser headers and footers disabled.
 
 ```jsonc
 "report_formats": [
@@ -110,7 +112,9 @@ Reconstruction uses the frozen run snapshot and evidence without contacting the 
 
 ## Validation and contributions
 
-Python 3.9 and 3.13 each pass 112 local fixture tests covering failures, cancellation, partial evidence, report formats, tool loops, media payloads and privacy. Extracted release execution and offline reconstruction are also checked. Real-model Agent protocol and image/audio compatibility remain unverified; use actual preflight and measurements for your deployment.
+Python 3.9 and 3.13 each pass 118 local fixture tests. On one Qwen3.6-35B-A3B / vLLM 0.25.1 deployment, post-restart named-tool tests completed 36/36 formal sessions in each condition: MTP on/32K, MTP off/8K and MTP off/32K initial characters. Tests covered both thinking modes, concurrency 1/5, three repetitions, five calls per session and unchanged 1024/4096-token budgets. Independent audits and byte-identical offline reconstruction passed. The 32K controls used identical configurations and initial-input hashes; server FSM error counts were 28/0/0. These observations do not establish the cause of earlier failures.
+
+Earlier auto/8K and named/32K runs each completed 35/36 sessions due to one exhausted output budget; those failures remain recorded. A passing run does not guarantee sustained reliability. Real image/audio compatibility and business-answer quality were not validated. See the [Agent guide](docs/AGENT_PERFORMANCE.md).
 
 ```bash
 python3 -m unittest discover -s tests -p 'test_standalone*benchmark.py'

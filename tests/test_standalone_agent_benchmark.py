@@ -41,9 +41,9 @@ def agent_config(url="http://127.0.0.1:1/v1/chat/completions", scenarios=None):
     return bench.validate_config(config)
 
 
-def agent_response(handler, body, *, usage=True, bad=False):
+def agent_response(handler, body, *, usage=True, bad=False, finish=None, exhaust=False):
     start_stream(handler)
-    is_tool = isinstance(body.get("tool_choice"), dict)
+    is_tool = isinstance(body.get("tool_choice"), dict) or body.get("tool_choice") == "auto"
     if enabled(body):
         event(handler, {"choices": [{"delta": {"reasoning_content": "private-agent-reasoning"}}]})
         time.sleep(0.004)
@@ -55,7 +55,15 @@ def agent_response(handler, body, *, usage=True, bad=False):
                 "type": "function",
                 "function": {"name": "benchmark_", "arguments": "{"},
             },
-            {"index": 0, "function": {"name": "step", "arguments": '"bad":true}' if bad else "}"}},
+            {
+                "index": 0,
+                "function": {
+                    "name": "step",
+                    "arguments": '"operation":"measure","bad":true}'
+                    if bad
+                    else '"operation":"measure"}',
+                },
+            },
         ):
             event(handler, {"choices": [{"delta": {"tool_calls": [delta]}}]})
             time.sleep(0.003)
@@ -65,11 +73,11 @@ def agent_response(handler, body, *, usage=True, bad=False):
         time.sleep(0.005)
         event(handler, {"choices": [{"delta": {"content": " done"}}]})
         reason = "stop"
-    last = {"choices": [{"delta": {}, "finish_reason": reason}]}
+    last = {"choices": [{"delta": {}, "finish_reason": finish or reason}]}
     if usage:
         last["usage"] = {
             "prompt_tokens": 50 * len(body["messages"]),
-            "completion_tokens": 12,
+            "completion_tokens": body["max_tokens"] if exhaust else 12,
             "completion_tokens_details": {"reasoning_tokens": 3 if enabled(body) else 0},
         }
     event(handler, last)
@@ -111,6 +119,8 @@ class AgentConfigurationTests(unittest.TestCase):
             {"enabled": True, "concurrency": [0]},
             {"enabled": True, "scenarios": ["image_input"]},
             {"enabled": True, "loop": {"model_calls_per_session": 1}},
+            {"enabled": True, "loop": {"tool_choice": "required"}},
+            {"enabled": True, "loop": {"tool_choice": {}}},
             {"enabled": True, "targets": {"loop": {"min_success_rate": 2}}},
         ):
             config = config_for()
@@ -126,7 +136,10 @@ class AgentConfigurationTests(unittest.TestCase):
                     {
                         "index": 0,
                         "id": "call_1",
-                        "function": {"name": "benchmark_step", "arguments": "{}"},
+                        "function": {
+                            "name": "benchmark_step",
+                            "arguments": '{"operation":"measure"}',
+                        },
                     }
                 ]
             },
@@ -196,6 +209,157 @@ class AgentConclusionTests(unittest.TestCase):
 
 
 class AgentRunTests(unittest.TestCase):
+    def test_named_stop_is_valid_only_with_complete_tool(self):
+        def behavior(handler, body):
+            agent_response(
+                handler, body, finish="stop" if isinstance(body.get("tool_choice"), dict) else None
+            )
+
+        with tempfile.TemporaryDirectory() as temp, LocalServer(behavior) as server:
+            summary = run(agent_config(server.url, ["loop"]), Path(temp) / "e")
+            self.assertEqual(summary["agent_performance"]["status"], "completed")
+
+    def test_tool_finish_cannot_hide_output_budget_exhaustion(self):
+        def behavior(handler, body):
+            agent_response(handler, body, exhaust="tools" in body)
+
+        with tempfile.TemporaryDirectory() as temp, LocalServer(behavior) as server:
+            config = agent_config(server.url, ["loop"])
+            config["agent_performance"]["loop"]["tool_choice"] = "auto"
+            directory = Path(temp) / "e"
+            summary = run(config, directory)
+            self.assertEqual(summary["agent_performance"]["status"], "partial")
+            records = [
+                json.loads(line)
+                for line in (directory / "agent_requests.jsonl").read_text().splitlines()
+            ]
+            result = next(r["request"] for r in records if r["record_type"] == "result")
+            self.assertEqual(result["finish_reason"], "tool_calls")
+            self.assertEqual(result["error"], "output_budget_exhausted")
+            self.assertTrue(result["output_budget_reached"])
+            self.assertIsNone(result["timings_ms"]["tool_ready"])
+            self.assertFalse(any(r["record_type"] == "tool_result" for r in records))
+
+    def test_auto_rejects_missing_tool_and_empty_final(self):
+        for failure in ("missing_tool", "empty_final", "reasoning_only_final"):
+
+            def behavior(handler, body, failure=failure):
+                reject = (failure == "missing_tool" and body.get("tool_choice") == "auto") or (
+                    failure != "missing_tool" and body.get("tool_choice") == "none"
+                )
+                if reject:
+                    start_stream(handler)
+                    content = (
+                        "No tool was called."
+                        if failure == "missing_tool"
+                        else "<think>private-agent-reasoning</think>"
+                        if failure == "reasoning_only_final"
+                        else "  "
+                    )
+                    event(
+                        handler,
+                        {"choices": [{"delta": {"content": content}, "finish_reason": "stop"}]},
+                    )
+                    event(handler, "[DONE]")
+                else:
+                    agent_response(handler, body)
+
+            with (
+                self.subTest(failure=failure),
+                tempfile.TemporaryDirectory() as temp,
+                LocalServer(behavior) as server,
+            ):
+                config = agent_config(server.url, ["loop"])
+                config["agent_performance"]["loop"]["tool_choice"] = "auto"
+                summary = run(config, Path(temp) / "e")
+                self.assertEqual(summary["agent_performance"]["status"], "partial")
+                self.assertTrue(
+                    all(row["status"] == "skipped" for row in summary["agent_performance"]["cells"])
+                )
+                self.assertEqual(
+                    sum("tools" in body for body, _ in server.requests),
+                    1 if failure == "missing_tool" else 2,
+                )
+
+    def test_auto_loop_uses_inert_data_and_explicit_steps(self):
+        with tempfile.TemporaryDirectory() as temp, LocalServer(agent_response) as server:
+            config = agent_config(server.url, ["loop"])
+            config["agent_performance"]["loop"]["tool_choice"] = "auto"
+            directory = Path(temp) / "e"
+            summary = run(config, directory)
+            self.assertEqual(summary["agent_performance"]["status"], "completed")
+            bodies = [body for body, _ in server.requests if "tools" in body]
+            self.assertTrue(bodies)
+            for body in bodies:
+                self.assertNotIn("持续输出", json.dumps(body, ensure_ascii=False))
+                self.assertEqual(body["messages"][-1]["role"], "user")
+                if body["tool_choice"] == "auto":
+                    self.assertIn("call benchmark_step once", body["messages"][-1]["content"])
+                else:
+                    self.assertEqual(body["tool_choice"], "none")
+                    self.assertIn(
+                        "All requested tool steps are complete", body["messages"][-1]["content"]
+                    )
+                self.assertEqual(len(body["messages"][1]["content"]), 128)
+                for msg in body["messages"]:
+                    if msg["role"] == "tool":
+                        self.assertEqual(len(msg["content"]), 128)
+            for row in summary["agent_performance"]["cells"]:
+                self.assertEqual(row["tool_choice"], "auto")
+                self.assertEqual(row["workload_version"], "agent-loop/v2")
+            self.assertIn("自动选择（auto）", (directory / "report.html").read_text())
+            self.assertEqual(bench.generate_report(directory), summary)
+
+    def test_auto_does_not_retry_invalid_finish(self):
+        for finish in ("stop", "length"):
+
+            def behavior(handler, body, finish=finish):
+                if body.get("tool_choice") == "auto":
+                    start_stream(handler)
+                    event(
+                        handler,
+                        {
+                            "choices": [
+                                {
+                                    "delta": {
+                                        "tool_calls": [
+                                            {
+                                                "index": 0,
+                                                "id": "call_1",
+                                                "function": {
+                                                    "name": "benchmark_step",
+                                                    "arguments": '{"operation":"measure"}',
+                                                },
+                                            }
+                                        ]
+                                    },
+                                    "finish_reason": finish,
+                                }
+                            ]
+                        },
+                    )
+                    event(handler, "[DONE]")
+                else:
+                    agent_response(handler, body)
+
+            with (
+                self.subTest(finish=finish),
+                tempfile.TemporaryDirectory() as temp,
+                LocalServer(behavior) as server,
+            ):
+                config = agent_config(server.url, ["loop"])
+                config["agent_performance"]["loop"]["tool_choice"] = "auto"
+                summary = run(config, Path(temp) / "e")
+                self.assertEqual(summary["agent_performance"]["status"], "partial")
+                self.assertEqual(sum("tools" in body for body, _ in server.requests), 1)
+
+    def test_loop_data_is_deterministic_exact_size(self):
+        for size in (128, 8192, 65536):
+            data = bench.make_loop_data(size, "seed", "session")
+            self.assertEqual(len(data), size)
+            self.assertEqual(data, bench.make_loop_data(size, "seed", "session"))
+            self.assertNotEqual(data, bench.make_loop_data(size, "seed", "other"))
+
     def test_loop_baseline_report_and_offline_rebuild(self):
         with tempfile.TemporaryDirectory() as temp, LocalServer(agent_response) as server:
             config = agent_config(server.url)
@@ -209,7 +373,7 @@ class AgentRunTests(unittest.TestCase):
             rows = [x for x in agent["cells"] if x["scenario"] == "loop"]
             self.assertTrue(all(x["metrics"]["session_completion_rate"] == 1 for x in rows))
             self.assertEqual(rows[1]["metrics"]["session_completed"], 2)
-            self.assertEqual(rows[1]["metrics"]["session_tokens"]["prompt_tokens"]["p50"], 600)
+            self.assertEqual(rows[1]["metrics"]["session_tokens"]["prompt_tokens"]["p50"], 900)
             self.assertEqual(rows[1]["metrics"]["session_tokens"]["completion_tokens"]["p50"], 36)
             self.assertTrue(
                 all(x["metrics"]["output_tps"]["count"] == 0 for x in rows[1]["rounds"][:-1])
@@ -231,7 +395,7 @@ class AgentRunTests(unittest.TestCase):
                 SECRET,
                 "private-agent-answer",
                 "private-agent-reasoning",
-                '"arguments": "{}"',
+                '"arguments":',
             ):
                 self.assertNotIn(secret, files)
             with mock.patch.object(bench, "perform_request", side_effect=AssertionError("offline")):
@@ -321,7 +485,9 @@ class AgentRunTests(unittest.TestCase):
             summary = run(config, directory)
             self.assertEqual(summary["agent_performance"]["status"], "completed")
             continuing = [
-                body for body, _ in server.requests if "tools" in body and len(body["messages"]) > 2
+                body
+                for body, _ in server.requests
+                if "tools" in body and any(m["role"] == "assistant" for m in body["messages"])
             ]
             self.assertTrue(continuing)
             self.assertTrue(
@@ -513,7 +679,7 @@ class AgentMediaAndBoundaryTests(unittest.TestCase):
                                             "id": "call_1",
                                             "function": {
                                                 "name": "benchmark_step",
-                                                "arguments": "{}",
+                                                "arguments": '{"operation":"measure"}',
                                             },
                                         }
                                     ]

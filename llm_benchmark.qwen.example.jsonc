@@ -63,7 +63,19 @@
 
   // Agent 场景专项：默认关闭；true 启用长上下文与多轮 Loop，参数见使用说明。
   "agent_performance": {
-    "enabled": false
+    "enabled": false,
+    "scenarios": ["long_context", "loop"],
+    "concurrency": [1, 5, 10],
+    "repetitions": 3,
+    "long_context": {"input_characters": [8192, 32768, 65536, 131072]},
+    "loop": {
+      // named 指定工具；auto 自动选择；每次运行固定，不自动回退。
+      "tool_choice": "named",
+      "initial_input_characters": 8192,
+      "model_calls_per_session": 10,
+      "tool_result_characters": 2048,
+      "tool_delay_ms": 0
+    }
   },
 
   // 测试后额外请求一次模型自评并保存其文字；不计入性能统计，false 可关闭。
