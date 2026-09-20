@@ -61,6 +61,11 @@
     "total_seconds": 600
   },
 
+  // Agent 场景专项：默认关闭；true 启用长上下文与多轮 Loop，参数见使用说明。
+  "agent_performance": {
+    "enabled": false
+  },
+
   // 测试后额外请求一次模型自评并保存其文字；不计入性能统计，false 可关闭。
   "self_review": true,
 

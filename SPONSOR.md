@@ -20,7 +20,7 @@ Scan the QR code above with WeChat and verify the recipient and amount before co
 
 ---
 
-也欢迎通过 [Star](https://gitee.com/xum1983/inferpulse-bench)、[反馈问题](https://gitee.com/xum1983/inferpulse-bench/issues) 或改进文档来支持项目。
+也欢迎通过 [Star](https://github.com/Siriuser/inferpulse-bench)、[反馈问题](https://github.com/Siriuser/inferpulse-bench/issues) 或改进文档来支持项目。
 
 Stars, bug reports and documentation contributions are also appreciated.
 

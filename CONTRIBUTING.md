@@ -4,7 +4,7 @@
 
 ## 报告问题
 
-在 [Issues](https://gitee.com/xum1983/inferpulse-bench/issues) 中提供：
+在 [Issues](https://github.com/Siriuser/inferpulse-bench/issues) 中提供：
 
 - 脚本版本（`python3 llm_benchmark.py --version`）、Python 版本和操作系统。
 - 模型系列、推理框架及版本（如果知道）、是否经过兼容网关。
@@ -25,6 +25,7 @@
 
 ```bash
 python3 -m py_compile llm_benchmark.py
+python3 -m unittest discover -s tests -p 'test_standalone*benchmark.py'
 python3 llm_benchmark.py --config llm_benchmark.deepseek.example.jsonc --dry-run
 python3 llm_benchmark.py --config llm_benchmark.qwen.example.jsonc --dry-run
 ```
@@ -37,7 +38,7 @@ python3 llm_benchmark.py --config llm_benchmark.qwen.example.jsonc --dry-run
 
 ## Reporting issues
 
-Use [Issues](https://gitee.com/xum1983/inferpulse-bench/issues). Include script/Python/OS versions, model family and serving framework if known, selected modes and test settings, minimal reproduction steps, expected and actual behavior, and the HTTP status or error category. State whether it reproduces consistently.
+Use [Issues](https://github.com/Siriuser/inferpulse-bench/issues). Include script/Python/OS versions, model family and serving framework if known, selected modes and test settings, minimal reproduction steps, expected and actual behavior, and the HTTP status or error category. State whether it reproduces consistently.
 
 Share only reviewed dry-run output or necessary report excerpts. Remove keys, private endpoints, internal model identifiers and request/response bodies. Never attach a filled runtime configuration or an unchecked evidence bundle. For sensitive credential-related problems, email **xum1983@gmail.com** with minimal redacted details; no fixed response time is promised.
 
