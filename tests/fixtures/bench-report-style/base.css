@@ -148,14 +148,18 @@ font-size: 9.5pt; line-height: 1.8; orphans: 3; widows: 3; }
 margin-top: 5mm; padding-top: 3mm; }
 .review-meta p { margin: 1mm 0; }
 @media print { .model-review { break-before: page; margin-top: 0; }
-.model-review > h2 { break-before: auto; } }
+.model-review > h2 { break-before: auto; }
+.model-review.review-unavailable { break-before: auto; } }
 @media screen and (max-width: 500px) { .review-rating { flex-wrap: wrap; }
 .review-rating p { text-align: left; } }
 .metric-chart { margin: 14px 0 20px; break-inside: avoid; }
 .metric-chart figcaption { font-size: 10pt; font-weight: 600; color: #284960; }
 .metric-chart svg { display: block; width: 100%; height: auto;
 font-family: inherit; fill: #284960; }
-footer { margin-top: 24px;
+.report-appendix { font-size: 9pt; line-height: 1.6; }
+.report-appendix p { margin: 7px 0; }
+.report-appendix p:last-of-type { break-after: avoid; }
+footer { break-inside: avoid; margin-top: 16px;
 padding-top: 12px;
 border-top: 1px solid #dce6ee;
 font-size: 9pt;
@@ -167,7 +171,7 @@ a { color: #2b73a8;
 max-width: none;
 margin: 0;
 padding: 0;
-} h2 { break-before: page;
+} h2 { break-before: auto;
 } .summary + h2 { break-before: auto;
 } }
 @media screen and (max-width: 700px) { main { padding: 5vw;

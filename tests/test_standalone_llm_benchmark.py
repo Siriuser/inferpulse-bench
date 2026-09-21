@@ -1304,7 +1304,8 @@ class WarmupTests(unittest.TestCase):
         self.assertEqual(summary["status"], "completed")
 
     def test_interrupt_during_later_warmup_preserves_measurements_and_offline_recovery(self):
-        for termination in (signal.SIGINT, signal.SIGKILL):
+        terminations = (signal.SIGINT, signal.SIGKILL) if os.name == "posix" else (None,)
+        for termination in terminations:
             active, release = threading.Event(), threading.Event()
 
             def behavior(handler, body, active=active, release=release):
@@ -1338,7 +1339,10 @@ class WarmupTests(unittest.TestCase):
                 )
                 try:
                     self.assertTrue(active.wait(5))
-                    process.send_signal(termination)
+                    if termination is None:
+                        process.kill()
+                    else:
+                        process.send_signal(termination)
                     stdout, stderr = process.communicate(timeout=4)
                 finally:
                     release.set()
@@ -1965,6 +1969,15 @@ class SelfReviewTests(unittest.TestCase):
 
 
 class ProcessAndEvidenceTests(unittest.TestCase):
+    def test_console_handles_chinese_with_legacy_stream_encoding(self):
+        output = io.BytesIO()
+        stream = io.TextIOWrapper(output, encoding="cp1252")
+        with mock.patch.object(sys, "stdout", stream), mock.patch.object(sys, "stderr", stream):
+            bench.configure_console()
+            print("预检：关闭思考", flush=True)
+        self.assertEqual(output.getvalue().decode("utf-8").strip(), "预检：关闭思考")
+        stream.detach()
+
     def test_unknown_family_stops_before_network_and_evidence_creation(self):
         with tempfile.TemporaryDirectory() as temporary, LocalServer() as server:
             root = Path(temporary)

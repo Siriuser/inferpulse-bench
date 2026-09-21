@@ -32,7 +32,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from urllib.parse import urlsplit
 
-VERSION = "1.10.2"
+VERSION = "1.10.3"
 SUPPORT_URL = "https://gitee.com/xum1983/inferpulse-bench/blob/master/SPONSOR.md"
 CONFIG_VERSION = "inferpulse.standalone.config/v1"
 EVIDENCE_VERSION = "inferpulse.standalone.evidence/v1"
@@ -1590,6 +1590,7 @@ def render_self_review_html(review):
         return []
     parts = ['<section class="model-review">', "<h2>模型自评</h2>"]
     if review.get("status") != "success" or not review.get("text"):
+        parts[0] = '<section class="model-review review-unavailable">'
         # Keep failed, stale and incomplete evidence explicit; never show a success rating.
         parts += [
             "<p>" + html.escape(line) + "</p>"
@@ -2703,14 +2704,18 @@ font-size: 9.5pt; line-height: 1.8; orphans: 3; widows: 3; }
 margin-top: 5mm; padding-top: 3mm; }
 .review-meta p { margin: 1mm 0; }
 @media print { .model-review { break-before: page; margin-top: 0; }
-.model-review > h2 { break-before: auto; } }
+.model-review > h2 { break-before: auto; }
+.model-review.review-unavailable { break-before: auto; } }
 @media screen and (max-width: 500px) { .review-rating { flex-wrap: wrap; }
 .review-rating p { text-align: left; } }
 .metric-chart { margin: 14px 0 20px; break-inside: avoid; }
 .metric-chart figcaption { font-size: 10pt; font-weight: 600; color: #284960; }
 .metric-chart svg { display: block; width: 100%; height: auto;
 font-family: inherit; fill: #284960; }
-footer { margin-top: 24px;
+.report-appendix { font-size: 9pt; line-height: 1.6; }
+.report-appendix p { margin: 7px 0; }
+.report-appendix p:last-of-type { break-after: avoid; }
+footer { break-inside: avoid; margin-top: 16px;
 padding-top: 12px;
 border-top: 1px solid #dce6ee;
 font-size: 9pt;
@@ -2722,7 +2727,7 @@ a { color: #2b73a8;
 max-width: none;
 margin: 0;
 padding: 0;
-} h2 { break-before: page;
+} h2 { break-before: auto;
 } .summary + h2 { break-before: auto;
 } }
 @media screen and (max-width: 700px) { main { padding: 5vw;
@@ -3061,7 +3066,7 @@ def render_html_report(summary):
     parts += render_agent_html(summary.get("agent_performance"))
     if config["self_review"]:
         parts += render_self_review_html(summary.get("self_review", {"status": "not_run"}))
-    parts += ["<h2>测量口径与附录</h2>", paragraph(CHART_NOTE)] + [
+    parts += ['<section class="report-appendix"><h2>测量口径与附录</h2>', paragraph(CHART_NOTE)] + [
         paragraph(note) for note in measurement_notes(summary)
     ]
     if summary.get("agent_performance"):
@@ -3069,7 +3074,8 @@ def render_html_report(summary):
     parts.append(
         '<footer>如果 InferPulse Bench 帮到了你，欢迎<a href="'
         + SUPPORT_URL
-        + '">打开支持页面</a>，请作者喝一杯瑞幸咖啡。支持全凭自愿，不影响任何功能的使用。</footer>'
+        + '">打开支持页面</a>，请作者喝一杯瑞幸咖啡。支持全凭自愿，不影响任何功能的使用。'
+        "</footer></section>"
     )
     style = report_styles(bool(summary.get("agent_performance")))
     return (
@@ -4990,7 +4996,15 @@ AGENT_NOTES = [
 ]
 
 
+def configure_console():
+    """Keep CLI output readable when redirected on non-UTF-8 systems."""
+    for stream in (sys.stdout, sys.stderr):
+        if hasattr(stream, "reconfigure"):
+            stream.reconfigure(encoding="utf-8", errors="backslashreplace")
+
+
 def main(argv=None):
+    configure_console()
     script_directory = Path(__file__).resolve().parent
     parser = argparse.ArgumentParser(
         description="直接运行即可读取脚本旁的 llm_benchmark.jsonc，报告保存在脚本旁。"
