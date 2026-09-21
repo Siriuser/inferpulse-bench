@@ -1,0 +1,35 @@
+name: Standalone benchmark
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  regression:
+    name: ${{ matrix.os }} / Python ${{ matrix.python }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-22.04, windows-latest, macos-14]
+        python: ['3.9', '3.13']
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    env:
+      PYTHONUTF8: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Run protocol, evidence, privacy and report regressions
+        run: python -m unittest discover -s tests -p 'test_standalone*benchmark.py' -v
+      - name: Verify version and configuration without service requests
+        run: |
+          python llm_benchmark.py --version
+          python llm_benchmark.py --config llm_benchmark.qwen.example.jsonc --dry-run
+          python llm_benchmark.py --config llm_benchmark.deepseek.example.jsonc --dry-run
