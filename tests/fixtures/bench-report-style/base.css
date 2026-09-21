@@ -159,10 +159,11 @@ font-family: inherit; fill: #284960; }
 .report-appendix { font-size: 9pt; line-height: 1.6; }
 .report-appendix p { margin: 7px 0; }
 .report-appendix p:last-of-type { break-after: avoid; }
-footer { break-inside: avoid; margin-top: 16px;
-padding-top: 12px;
-border-top: 1px solid #dce6ee;
-font-size: 9pt;
+footer { break-inside: avoid; margin-top: 18px;
+padding: 12px 14px;
+border: 1px solid #c7ddeb;
+background: #edf6fc; color: #2d6089;
+font-size: 10.5pt; font-weight: 600; line-height: 1.65;
 }
 a { color: #2b73a8;
 }

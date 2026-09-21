@@ -1245,13 +1245,13 @@ class WarmupTests(unittest.TestCase):
     def test_warmup_timeout_uses_configured_deadline_then_continues(self):
         def behavior(handler, body):
             if is_warmup(body):
-                time.sleep(0.15)
+                time.sleep(1.5)
             else:
                 completion(handler, body)
 
         def configure(config):
             config.update(thinking_modes=["off"], input_characters=[128], concurrency=[1])
-            config["timeouts"]["read_seconds"] = 0.05
+            config["timeouts"]["read_seconds"] = 0.5
 
         summary, _, _, requests, _, _ = self.run_warm(behavior, configure)
         self.assertEqual(len(requests), 3)
