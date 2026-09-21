@@ -1,0 +1,2 @@
+
+@media print { h2 { break-before: auto; } .agent-title { break-before: page; } }

@@ -2276,6 +2276,56 @@ class ProcessAndEvidenceTests(unittest.TestCase):
 
 
 class ReportFormatTests(unittest.TestCase):
+    def test_report_css_matches_accepted_style_baseline(self):
+        root = ROOT / "tests/fixtures/bench-report-style"
+        base = (root / "base.css").read_text(encoding="utf-8")
+        agent = (root / "agent-print.css").read_text(encoding="utf-8")
+        for enabled in (False, True):
+            with self.subTest(agent=enabled):
+                self.assertEqual(
+                    bench.report_styles(enabled),
+                    base + (agent if enabled else ""),
+                    "报告样式偏离已确认基线；有意调整时同步更新 "
+                    "docs/design/bench-report-style/README.md 的版本与变更记录及样式快照。",
+                )
+
+    @staticmethod
+    def style_chart_samples():
+        # Synthetic layout-only data: no real model, endpoint, payload or run identifiers.
+        def point(value, index):
+            return {
+                "value": value,
+                "flagged": True,
+                "source": "style-sample-" + str(index),
+                "target": bench.detail_anchor("style-sample-" + str(index)),
+                "marker": "A" if index == 3 else "",
+                "note": "有效样本 3；截断 1",
+            }
+
+        points = [point(value, index) for index, value in enumerate([0, 4, None, 8])]
+        return {
+            "matrix.html": bench.html_matrix_chart(
+                "最终回答等待 · TTFO P50（秒，越低越好）",
+                ["1,024 字符 · 并发 1", "2,048 字符 · 并发 1"],
+                [("关闭思考", points[:2]), ("开启思考", points[2:])],
+            ),
+            "line.html": bench.html_line_chart(
+                "首 Token 等待 · TTFT P95（秒，越低越好）",
+                [("并发 1", list(zip([1024, 2048, 4096, 8192], points)))],
+            ),
+        }
+
+    def test_svg_matches_accepted_style_baseline(self):
+        root = ROOT / "tests/fixtures/bench-report-style"
+        for name, document in self.style_chart_samples().items():
+            with self.subTest(chart=name):
+                self.assertEqual(
+                    document,
+                    (root / name).read_text(encoding="utf-8"),
+                    "图表样式偏离已确认基线；请核对坐标、缺失值、重点标记与链接，"
+                    "有意调整时同步更新样式规范和快照。",
+                )
+
     def test_html_only_run_cli_reports_only_existing_file(self):
         with tempfile.TemporaryDirectory() as temporary, LocalServer() as server:
             directory = Path(temporary)
@@ -2505,6 +2555,179 @@ class ReportFormatTests(unittest.TestCase):
             summary["cells"][0]["metrics"]["latency_ms"]["ttft"]["p95"] = 100
             summary["cells"][1]["status"] = "partial"
             self.assertIn("未筛出", "\n".join(bench.performance_observations(summary)))
+
+    def test_conclusions_precede_details_and_preserve_incomplete_answers(self):
+        with self.completed(["md", "html"], thinking_modes=["off"]) as (_, summary, _):
+            metrics = summary["cells"][0]["metrics"]
+            metrics.update(truncated_count=2, final_answer_count=1, unknown_answer_count=1)
+            for document in (bench.render_report(summary), bench.render_html_report(summary)):
+                self.assertLess(document.index("关键结论"), document.index("测试条件"))
+                self.assertLess(document.index("性能变化分析"), document.index("测试条件"))
+                self.assertIn("截断 2 次，未产生最终回答 1 次", document)
+                self.assertIn("最终回答状态未知 1 次", document)
+
+    def test_review_sections_preserve_words_and_escape_model_markup(self):
+        from html.parser import HTMLParser
+
+        class Text(HTMLParser):
+            def __init__(self):
+                super().__init__()
+                self.values = []
+
+            def handle_data(self, data):
+                self.values.append(data)
+
+        body = "1. 首句。后文 <script>alert(1)</script>\n\n2. 第二项\n原文 **强调**。"
+        review = {
+            "status": "success",
+            "rating": "人上人",
+            "text": "综合档位：人上人\n" + body,
+            "request": {"truncated": True},
+        }
+        document = "".join(bench.render_self_review_html(review))
+        text = Text()
+        text.feed(document)
+        self.assertIn("".join(body.split()), "".join("".join(text.values).split()))
+        self.assertEqual(document.count('class="review-section"'), 2)
+        self.assertEqual(document.count("综合档位："), 1)
+        self.assertIn("以下内容可能不完整", document)
+        self.assertNotIn("<script>", document)
+        self.assertIn("&lt;script&gt;", document)
+        fallback = bench.self_review_body_html("1. 一。\n3. 三。")
+        self.assertNotIn('class="review-section"', fallback)
+        failed = "".join(bench.render_self_review_html({"status": "failed", "reason": "timeout"}))
+        self.assertNotIn('class="review-rating"', failed)
+        self.assertIn("生成失败", failed)
+
+    def test_charts_precede_tables_and_convert_latency_without_mutation(self):
+        with self.completed(["html"]) as (_, summary, _):
+            before = copy.deepcopy(summary)
+            document = bench.render_html_report(summary)
+            for heading in ("双模式对照", "关闭思考 · 性能明细", "开启思考 · 性能明细"):
+                start = document.index(">" + heading + "</h2>")
+                self.assertLess(document.index("<figure", start), document.index("<table", start))
+            row = summary["cells"][0]
+            self.assertEqual(
+                bench.chart_point(row, "ttfo", "p50")["value"],
+                row["metrics"]["latency_ms"]["ttfo"]["p50"] / 1000,
+            )
+            self.assertEqual(summary, before)
+
+    def test_chart_null_gaps_zero_values_and_escaping(self):
+        import xml.etree.ElementTree as ET
+
+        def point(value):
+            return {"value": value, "flagged": True, "source": '<bad"id>', "note": "<script>"}
+
+        series = [("<mode>", [(128, point(0)), (256, point(None)), (512, point(10))])]
+        document = bench.html_line_chart("<title>", series)
+        root = ET.fromstring(document[document.index("<svg") : document.index("</svg>") + 6])
+        ns = {"s": "http://www.w3.org/2000/svg"}
+        circles = root.findall("s:circle", ns)
+        self.assertEqual(len(circles), 2)  # Keep real zero; do not fabricate a missing point.
+        self.assertEqual(circles[0].attrib["cy"], "200.00")
+        self.assertEqual(circles[0].attrib["fill"], "white")
+        line = next(p for p in root.findall("s:path", ns) if p.attrib.get("d", "").count("M") == 2)
+        self.assertNotIn("L", line.attrib["d"])  # Never connect across the null.
+        self.assertNotIn("<script>", document)
+        matrix = bench.html_matrix_chart(
+            "value", ["zero", "missing"], [("mode", [point(0), point(None)])]
+        )
+        self.assertIn("0.00*", matrix)
+        self.assertIn("—", matrix)
+
+    def test_key_scene_uses_lowest_shared_load_without_filtering_failures(self):
+        rows = [
+            {
+                "mode": mode,
+                "input_characters": size,
+                "concurrency": concurrency,
+                "status": "partial" if (size, concurrency) == (256, 1) else "completed",
+            }
+            for size, concurrency, modes in [
+                (128, 1, ["off"]),
+                (256, 3, bench.MODES),
+                (256, 1, bench.MODES),
+            ]
+            for mode in modes
+        ]
+        selected = bench.key_scene_rows(list(reversed(rows)))
+        self.assertEqual({r["input_characters"] for r in selected.values()}, {256})
+        self.assertEqual({r["concurrency"] for r in selected.values()}, {1})
+        self.assertEqual(selected["on"]["status"], "partial")
+        self.assertIsNone(bench.key_scene_rows([r for r in rows if r["mode"] == "off"]))
+        self.assertEqual(bench.key_scene_html([]), "")
+
+    def test_anomaly_links_match_real_rows_and_keep_raw_summary_unchanged(self):
+        from html.parser import HTMLParser
+
+        class Links(HTMLParser):
+            def __init__(self):
+                super().__init__()
+                self.ids, self.targets, self.marks = [], [], []
+
+            def handle_starttag(self, tag, attrs):
+                attrs = dict(attrs)
+                if "id" in attrs:
+                    self.ids.append(attrs["id"])
+                if attrs.get("href", "").startswith("#"):
+                    self.targets.append(attrs["href"][1:])
+                if "data-cell-id" in attrs:
+                    self.marks.append(attrs["data-cell-id"])
+
+        with self.completed(["md"]) as (_, summary, _):
+            originals = summary["cells"]
+            summary["cells"] = []
+            summary["config"]["input_characters"] = [128, 256, 512]
+            for original in originals:
+                for size, value in ((128, 100), (256, 150), (512, 90)):
+                    row = copy.deepcopy(original)
+                    row.update(input_characters=size, id=f"{original['mode']}-{size}<unsafe>")
+                    row["metrics"]["latency_ms"]["ttft"]["p95"] = value
+                    row["metrics"]["latency_ms"]["e2e"]["p95"] = 100
+                    row["metrics"]["aggregate_output_tps"] = 100
+                    summary["cells"].append(row)
+            before = copy.deepcopy(summary)
+            highlights = bench.performance_highlights(summary)
+            self.assertEqual(len(highlights), 2)
+            document = bench.render_html_report(summary)
+            parsed = Links()
+            parsed.feed(document)
+            self.assertEqual(len(parsed.ids), len(set(parsed.ids)))
+            self.assertTrue(parsed.targets)
+            self.assertFalse(set(parsed.targets) - set(parsed.ids))
+            for item in highlights:
+                self.assertEqual(item["current"]["input_characters"], 256)
+                self.assertIn(item["current"]["id"], parsed.marks)
+                self.assertIn(bench.detail_anchor(item["current"]["id"]), parsed.targets)
+            self.assertIn("TTFT P95（秒", document)
+            self.assertIn("升高 50.0%", document)
+            self.assertIn("局部劣化", document)
+            self.assertIn('class="focus-row"', document)
+            self.assertEqual(document.count('class="scene-card"'), 2)
+            self.assertLess(document.index('class="key-scene"'), document.index("性能变化分析"))
+            self.assertEqual(document.count(bench.CHART_NOTE), 1)
+            self.assertNotIn("浅 → 深", document)
+            self.assertNotIn("<unsafe>", document)
+            self.assertEqual(summary, before)
+
+    def test_large_matrix_highlights_are_bounded_without_mutating_metrics(self):
+        with self.completed(["md"], thinking_modes=["off"]) as (_, summary, _):
+            original = summary["cells"][0]
+            summary["cells"] = []
+            for concurrency in (1, 3, 5):
+                for size in (128, 256, 512, 1024, 2048):
+                    row = copy.deepcopy(original)
+                    row.update(input_characters=size, concurrency=concurrency)
+                    for metric in ("ttft", "e2e"):
+                        row["metrics"]["latency_ms"][metric]["p95"] = size * concurrency
+                    summary["cells"].append(row)
+            before = copy.deepcopy(summary)
+            findings = bench.performance_observations(summary)
+            self.assertGreater(len(findings), 0)
+            self.assertLessEqual(len(findings), 3)
+            self.assertLess(sum(map(len, findings)), 700)
+            self.assertEqual(summary, before)
 
 
 if __name__ == "__main__":

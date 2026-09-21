@@ -32,7 +32,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from urllib.parse import urlsplit
 
-VERSION = "1.10.1"
+VERSION = "1.10.2"
 SUPPORT_URL = "https://gitee.com/xum1983/inferpulse-bench/blob/master/SPONSOR.md"
 CONFIG_VERSION = "inferpulse.standalone.config/v1"
 EVIDENCE_VERSION = "inferpulse.standalone.evidence/v1"
@@ -342,6 +342,7 @@ def config_template(raw=None):
         "report_formats": list(REPORT_FORMATS),
         "agent_performance": {
             "enabled": False,
+            "output_tokens": {"off": 4096, "on": 16384},
             "scenarios": ["long_context", "loop"],
             "concurrency": [1, 5, 10],
             "repetitions": 3,
@@ -374,6 +375,7 @@ def config_template(raw=None):
         "total_seconds 为单请求总耗时。",
         "self_review": "测试后额外请求一次模型自评并保存其文字；不计入性能统计，false 可关闭。",
         "agent_performance": "Agent 场景性能专项；默认关闭，true 开启。"
+        "output_tokens 独立设置每次模型调用的输出上限（含思考），不影响常规测试。"
         "loop.tool_choice 支持 named（指定工具）或 auto（自动选择），不自动回退。",
         "report_formats": "报告格式：默认同时生成 md 和 html；"
         "用 // 注释掉不需要的行，至少保留一项。",
@@ -1555,6 +1557,76 @@ def render_self_review(review):
     return lines
 
 
+def self_review_body_html(text):
+    """Style a consecutive numbered review without inventing headings or changing its words."""
+    markers = list(re.finditer(r"(?m)^([0-9]{1,2})[.、)][ \t]+", text))
+    if (
+        len(markers) < 2
+        or markers[0].start() != 0
+        or [int(m[1]) for m in markers] != list(range(1, len(markers) + 1))
+    ):
+        return '<div class="review">' + html.escape(text) + "</div>"
+    sections = []
+    for index, marker in enumerate(markers):
+        end = markers[index + 1].start() if index + 1 < len(markers) else len(text)
+        content = text[marker.end() : end]
+        # The model's own opening sentence/heading supplies the hierarchy, not a new summary.
+        breaks = [
+            p for p in (content.find("。"), content.find("："), content.find("\n")) if 0 <= p <= 85
+        ]
+        split = min(breaks) + 1 if breaks else 0
+        number = '<span class="review-number">' + html.escape(marker[0]) + "</span>"
+        if split:
+            body = "<h3>" + number + html.escape(content[:split]) + "</h3>"
+            body += '<div class="review">' + html.escape(content[split:]) + "</div>"
+        else:
+            body = '<div class="review">' + number + html.escape(content) + "</div>"
+        sections.append('<section class="review-section">' + body + "</section>")
+    return "".join(sections)
+
+
+def render_self_review_html(review):
+    if review.get("status") == "disabled":
+        return []
+    parts = ['<section class="model-review">', "<h2>模型自评</h2>"]
+    if review.get("status") != "success" or not review.get("text"):
+        # Keep failed, stale and incomplete evidence explicit; never show a success rating.
+        parts += [
+            "<p>" + html.escape(line) + "</p>"
+            for line in render_self_review(review)
+            if line and not line.startswith("## ")
+        ]
+        return parts + ["</section>"]
+    parts.append('<p class="review-subtitle">让模型说说，这一轮表现如何</p>')
+    rating = review.get("rating")
+    recognized = rating in REVIEW_RATINGS
+    parts.append(
+        '<div class="review-rating"><div><span class="review-eyebrow">综合档位：</span>'
+        "<strong>" + html.escape(rating if recognized else "档位未识别") + "</strong></div>"
+        "<p>模型主观自评<br><span>仅限本次已测范围 · 不构成排名或认证</span></p></div>"
+    )
+    parts.append(
+        '<p class="review-notice">依据本次常规汇总数据生成，未经事实核验；'
+        "不计入性能统计，不改变运行状态。</p>"
+    )
+    if not recognized:
+        parts.append('<p class="review-warning">模型未返回约定档位；保留原评语。</p>')
+    if (review.get("request") or {}).get("truncated") or review.get("text_clipped"):
+        parts.append('<p class="review-warning">自评达到输出或保存上限，以下内容可能不完整。</p>')
+    text = review["text"]
+    if recognized and self_review_rating(text) == rating:
+        text = "".join(text.lstrip().splitlines(keepends=True)[1:]).lstrip("\r\n")
+    parts.append('<div class="review-body">' + self_review_body_html(text) + "</div>")
+    request_notes = [line for line in render_self_review(review) if line.startswith("请求设置：")]
+    if request_notes:
+        parts.append(
+            '<div class="review-meta"><b>自评请求信息</b><p>'
+            + html.escape(request_notes[0])
+            + "</p></div>"
+        )
+    return parts + ["</section>"]
+
+
 def fmt(value, percent=False):
     if value is None:
         return "N/A"
@@ -1644,9 +1716,75 @@ def measurement_notes(summary):
         "分布样本数保存在 summary.json。",
         "变化分析仅筛选相邻已完成且全部协议成功、各至少 3 个样本的组合；"
         "TTFT/E2E P95 升高或聚合吞吐下降至少 20% 时列为关注点。"
+        "按相对变化幅度排序，常规最多展示 3 条，同模式同变化轴不重复；"
+        "Agent 每个场景最多展示 1 条、合计最多 3 条，完整规则观察保留在 summary.json。"
         "20% 是描述性筛选阈值，不是统计显著性、SLA 或容量阈值；"
         "不同输出长度、缓存、预热及样本差异可能影响可比性。",
     ] + [str(warning) for warning in summary["warnings"]]
+
+
+def agent_outcomes(agent):
+    """Compact outcomes without treating tool-call turns as missing final answers."""
+    if not agent:
+        return []
+    notes = []
+    for scenario in AGENT_SCENARIOS:
+        rows = [r for r in agent["cells"] if r["scenario"] == scenario]
+        if not rows:
+            continue
+        total = sum(r["metrics"]["attempted_count"] for r in rows)
+        success = sum(r["metrics"]["success_count"] for r in rows)
+        truncated = sum(r["metrics"]["truncated_count"] for r in rows)
+        text = f"{AGENT_LABELS[scenario]}：协议完成 {success}/{total}，截断 {truncated} 次"
+        if scenario == "loop":
+            done = sum(r["metrics"]["session_completed"] for r in rows)
+            sessions = sum(r["metrics"]["session_attempted"] for r in rows)
+            text += f"；工具闭环 {done}/{sessions}"
+        unfinished = sum(r["status"] != "completed" for r in rows)
+        if unfinished:
+            text += f"；{unfinished} 个组合未完成"
+        notes.append(text + "。")
+    return notes
+
+
+def report_conclusions(summary):
+    rows = summary["cells"]
+    success = sum(r["metrics"]["success_count"] for r in rows)
+    truncated = sum(r["metrics"]["truncated_count"] for r in rows)
+    missing = sum(
+        max(
+            0,
+            r["metrics"]["success_count"]
+            - r["metrics"]["final_answer_count"]
+            - r["metrics"]["unknown_answer_count"],
+        )
+        for r in rows
+    )
+    unresolved = sum(r["metrics"]["unresolved_count"] for r in rows)
+    unknown = sum(r["metrics"]["unknown_answer_count"] for r in rows)
+    notes = [
+        f"常规测试：协议完成 {success}/{summary['planned_performance_requests']}；"
+        f"截断 {truncated} 次，未产生最终回答 {missing} 次。"
+    ]
+    if summary["status"] != "completed" or unresolved or unknown:
+        notes.append(
+            f"执行状态 {summary['status']}；未决请求 {unresolved} 次，"
+            f"最终回答状态未知 {unknown} 次。"
+        )
+    for mode, state in summary["modes"].items():
+        if not state["preflight_success"] or state["observation"] in (
+            "contradicted",
+            "unconfirmed",
+        ):
+            notes.append(f"{MODE_LABELS[mode]}：预检或模式验证未通过确认，见模式验证记录。")
+    notes += agent_outcomes(summary.get("agent_performance"))
+    agent = summary.get("agent_performance")
+    checks = [c for r in agent["cells"] for c in r["target_checks"]] if agent else []
+    if checks:
+        failed = sum(c["result"] == "本次观测未达标" for c in checks)
+        unknown = sum(c["result"] == "无法评估" for c in checks)
+        notes.append(f"Agent 配置目标：{failed} 项未达标，{unknown} 项无法评估。")
+    return notes
 
 
 def render_report(summary):
@@ -1682,6 +1820,13 @@ def render_report(summary):
         + "；思考强度、采样参数使用服务默认值。",
         "",
     ]
+    # Put the decision-facing summary before configuration and measurement tables.
+    details = lines[3:]
+    lines = lines[:2] + [md(config["model"]["name"]), "", "## 关键结论", ""]
+    lines += ["- " + md(value) for value in report_conclusions(summary)]
+    lines += ["", "## 性能变化分析", ""]
+    lines += ["- " + md(value) for value in performance_observations(summary)]
+    lines += ["", "## 测试条件", ""] + details
     lines += render_warmup(summary["warmup"])
     observation_labels = {
         "contradicted": "模式行为矛盾：关闭思考却观测到思考",
@@ -1807,7 +1952,6 @@ def render_report(summary):
                 lines.append(f"| {size} | {concurrency} | {values} |")
     else:
         lines += ["本次只选择一种思考模式，不生成双模式对照。", ""]
-    lines += ["", "## 性能变化分析", ""] + performance_observations(summary)
     lines += render_agent_md(summary.get("agent_performance"))
     if summary["config"]["self_review"]:
         lines += render_self_review(summary.get("self_review", {"status": "not_run"}))
@@ -1826,7 +1970,7 @@ def render_report(summary):
     return "\n".join(lines) + "\n"
 
 
-def performance_observations(summary):
+def performance_highlights(summary):
     """Descriptive adjacent-point screening, never a significance test or capacity estimate."""
     observations = []
     for mode in summary["config"]["thinking_modes"]:
@@ -1900,41 +2044,697 @@ def performance_observations(summary):
                             text += "缺少完整的下一档观测，不能判定持续转折。"
                         ma, mb = before["metrics"], current["metrics"]
                         text += (
-                            f"两档成功样本数 {ma['success_count']}/{mb['success_count']}，"
+                            f"样本 {ma['success_count']}/{mb['success_count']}，"
                             f"截断 {ma['truncated_count']}/{mb['truncated_count']}，"
                             f"实际输出 Token P50 {fmt(ma['tokens']['completion_tokens']['p50'])}/"
                             f"{fmt(mb['tokens']['completion_tokens']['p50'])}。"
-                            + (
-                                "首响应或完成等待增加。"
-                                if direction == 1
-                                else "该批次窗口内的输出吞吐降低。"
-                            )
-                            + "实际输出长度、缓存与预热可能影响可比性；建议固定条件重复相邻档位，"
-                            "不能仅据此归因硬件瓶颈或容量上限。"
                         )
-                        observations.append(text)
-    return observations or [
-        "本次未筛出满足条件的明显劣化关注点；这不表示不存在性能退化。"
-        "失败、未完成、样本不足或缺失指标的组合仍需结合明细检查。"
+                        observations.append(
+                            {
+                                "change": change,
+                                "group": (mode, axis),
+                                "text": text,
+                                "before": before,
+                                "current": current,
+                                "following": following if c is not None else None,
+                                "values": (a, b, c),
+                                "metric": metric,
+                                "label": label,
+                                "unit": metric_unit,
+                                "axis": axis,
+                                "axis_unit": unit,
+                                "condition": condition,
+                                "trend": trend,
+                            }
+                        )
+    selected, groups = [], set()
+    for item in sorted(observations, key=lambda x: -x["change"]):
+        group = item["group"]
+        if group not in groups:
+            selected.append(item)
+            groups.add(group)
+        if len(selected) == 3:
+            break
+    return selected
+
+
+def performance_observations(summary):
+    return [item["text"] for item in performance_highlights(summary)] or [
+        "未筛出可比样本中达到 20% 的劣化点；未完成或样本不足的组合不参与判断。"
     ]
 
 
-def html_table(headers, rows):
+def detail_anchor(source, section="latency"):
+    # Hash untrusted identifiers so all links remain local fragments with stable, unique targets.
+    return "detail-" + hashlib.sha256(str(source).encode("utf-8")).hexdigest()[:20] + "-" + section
+
+
+def metric_section(key):
+    return (
+        "latency"
+        if key in ("ttft", "ttfo", "e2e")
+        else "loop"
+        if key == "tool_ready_ms"
+        else "output"
+    )
+
+
+def highlight_labels(highlights):
+    labels = {}
+    for index, item in enumerate(highlights):
+        labels.setdefault(item["current"]["id"], []).append(chr(65 + index))
+    return {source: "/".join(markers) for source, markers in labels.items()}
+
+
+def html_table(headers, rows, sources=None, section="latency", highlights=None):
     """All cells are plain text; model/service content can never become executable markup."""
 
     def escape(value):
         return html.escape(str(value), quote=True)
 
+    def table_row(index, row):
+        source = sources[index] if sources is not None else None
+        marker = (highlights or {}).get(source)
+        attrs = (' id="' + detail_anchor(source, section) + '"') if source is not None else ""
+        if marker:
+            attrs += ' class="focus-row"'
+        cells = []
+        for column, value in enumerate(row):
+            badge = (
+                '<a class="focus-badge" href="#anomaly-'
+                + escape(marker.split("/")[0])
+                + '">'
+                + escape(marker)
+                + "</a> "
+                if column == 0 and marker
+                else ""
+            )
+            cells.append("<td>" + badge + escape(value) + "</td>")
+        return "<tr" + attrs + ">" + "".join(cells) + "</tr>"
+
     return (
         "<table><thead><tr>"
         + "".join('<th scope="col">' + escape(value) + "</th>" for value in headers)
         + "</tr></thead><tbody>"
-        + "".join(
-            "<tr>" + "".join("<td>" + escape(value) + "</td>" for value in row) + "</tr>"
-            for row in rows
-        )
+        + "".join(table_row(index, row) for index, row in enumerate(rows))
         + "</tbody></table>"
     )
+
+
+def chart_metric(row, key, quantile="p95"):
+    metrics = row["metrics"]
+    if key in ("ttft", "ttfo", "e2e"):
+        value = metrics["latency_ms"][key][quantile]
+        return value / 1000 if value is not None else None
+    if key == "aggregate_output_tps":
+        return metrics[key]
+    return metrics[key][quantile]
+
+
+def chart_point(row, key, quantile="p95", highlights=None):
+    m = row["metrics"]
+    count = (
+        m["latency_ms"][key]["count"]
+        if key in ("ttft", "ttfo", "e2e")
+        else m[key]["count"]
+        if key != "aggregate_output_tps"
+        else m["success_count"]
+    )
+    flagged = row["status"] != "completed" or m["truncated_count"] > 0 or count < 3
+    return {
+        "value": chart_metric(row, key, quantile),
+        "flagged": flagged,
+        "source": row["id"],
+        "target": detail_anchor(row["id"], metric_section(key)),
+        "marker": (highlights or {}).get(row["id"], ""),
+        "note": f"有效样本 {count}；截断 {m['truncated_count']}；状态 {row['status']}",
+    }
+
+
+def chart_number(value):
+    return f"{value:.2f}" if abs(value) < 1000 else f"{value:,.0f}"
+
+
+def chart_link(point, markup):
+    if not point.get("target"):
+        return markup
+    return '<a href="#' + html.escape(point["target"], quote=True) + '">' + markup + "</a>"
+
+
+def html_matrix_chart(title, labels, series):
+    """Paired mode comparison with one shared zero-based color scale and explicit nulls."""
+    esc = html.escape
+    values = [p["value"] for _, points in series for p in points if p["value"] is not None]
+    maximum = max(values, default=0) or 1
+    figures = []
+    # Limit each figure to a printable height; repeat headers and use the same scale.
+    page_size = math.ceil(len(labels) / math.ceil(len(labels) / 12)) if labels else 1
+    for start in range(0, len(labels), page_size):
+        chunk = labels[start : start + page_size]
+        height = 44 + 32 * len(chunk)
+        width = 340 / max(len(series), 1)
+        svg = [
+            f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 680 {height}" role="img">',
+            "<title>" + esc(title) + "</title>",
+        ]
+        for index, (name, points) in enumerate(series):
+            x = 325 + index * width
+            svg.append(
+                f'<text x="{x + width / 2:.1f}" y="22" text-anchor="middle" '
+                f'font-size="13">{esc(name)}</text>'
+            )
+            for offset, label in enumerate(chunk):
+                point = points[start + offset]
+                value = point["value"]
+                y = 36 + offset * 32
+                strength = 0 if value is None else max(0, min(1, value / maximum))
+                fill = (
+                    "#f1f4f6"
+                    if value is None
+                    else f"#{round(242 - 132 * strength):02x}"
+                    f"{round(248 - 78 * strength):02x}{round(252 - 38 * strength):02x}"
+                )
+                displayed = (
+                    "—"
+                    if value is None
+                    else chart_number(value) + ("*" if point["flagged"] else "")
+                )
+                marker = point.get("marker", "")
+                if marker:
+                    displayed = marker + " · " + displayed
+                svg.append(
+                    chart_link(
+                        point,
+                        f'<g data-cell-id="{esc(str(point["source"]), quote=True)}"><title>'
+                        + esc(f"{label} · {name}：{displayed}；{point['note']}")
+                        + "</title>"
+                        + f'<rect x="{x:.1f}" y="{y}" width="{width - 4:.1f}" '
+                        f'height="28" fill="{fill}" stroke="{"#b87924" if marker else "none"}"/>'
+                        + f'<text x="{x + width / 2:.1f}" y="{y + 19}" text-anchor="middle" '
+                        f'font-size="13">{displayed}</text></g>',
+                    )
+                )
+        for offset, label in enumerate(chunk):
+            svg.append(
+                f'<text x="10" y="{55 + offset * 32}" font-size="13">{esc(str(label))}</text>'
+            )
+        svg.append("</svg>")
+        figures.append(
+            '<figure class="metric-chart"><figcaption>'
+            + esc(title)
+            + "</figcaption>"
+            + "".join(svg)
+            + "</figure>"
+        )
+    return "".join(figures)
+
+
+def html_line_chart(title, series, x_label="输入字符（log₂ 刻度）", logarithmic=True):
+    """Numeric axes, explicit missing-point gaps, no interpolation through absent evidence."""
+    esc = html.escape
+    xs = sorted({x for _, points in series for x, _ in points})
+    if not xs:
+        return ""
+    values = [p["value"] for _, points in series for _, p in points if p["value"] is not None]
+    maximum = (max(values, default=0) or 1) * 1.08
+    transform = math.log2 if logarithmic else float
+    left, right = transform(xs[0]), transform(xs[-1])
+
+    def position(x):
+        return 365 if left == right else 64 + (transform(x) - left) * 596 / (right - left)
+
+    svg = [
+        '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 680 260" role="img">',
+        "<title>" + esc(title) + "</title>",
+    ]
+    colors = ("#286d9c", "#af6d25", "#547b54", "#865677")
+    for i in range(5):
+        value = maximum * i / 4
+        y = 200 - 152 * i / 4
+        svg.append(
+            f'<path d="M64 {y:.1f} H660" stroke="#dce6ee" fill="none"/>'
+            f'<text x="56" y="{y + 4:.1f}" text-anchor="end" '
+            f'font-size="11">{chart_number(value)}</text>'
+        )
+    svg.append('<path d="M64 48 V200 H660" stroke="#8b9da9" fill="none"/>')
+    for i, (name, points) in enumerate(series):
+        color = colors[i % len(colors)]
+        dash = ("", "7 3", "2 3", "8 3 2 3")[i % 4]
+        x = 66 + i * 148
+        svg.append(
+            f'<path d="M{x} 20 h23" stroke="{color}" stroke-width="2" stroke-dasharray="{dash}"/>'
+            f'<text x="{x + 29}" y="24" font-size="12">{esc(name)}</text>'
+        )
+        path = []
+        active = False
+        marks = []
+        for x, point in sorted(points, key=lambda p: p[0]):
+            value = point["value"]
+            if value is None:
+                active = False
+                continue
+            px, py = position(x), 200 - value / maximum * 152
+            path.append(f"{'L' if active else 'M'}{px:.2f} {py:.2f}")
+            active = True
+            fill = "white" if point["flagged"] else color
+            marker = point.get("marker", "")
+            mark = (
+                f'<circle cx="{px:.2f}" cy="{py:.2f}" r="4" fill="{fill}" '
+                f'stroke="{color}" stroke-width="1.6" '
+                f'data-cell-id="{esc(str(point["source"]), quote=True)}"><title>'
+                + esc(f"{name} · {x}：{chart_number(value)}；{point['note']}")
+                + "</title></circle>"
+            )
+            if marker:
+                # Place labels inside the plot even at its right edge; preserve hollow points.
+                tx = px - 9 if px > 610 else px + 9
+                anchor = "end" if px > 610 else "start"
+                mark += (
+                    f'<text x="{tx:.2f}" y="{py - 9:.2f}" text-anchor="{anchor}" '
+                    'font-size="12" font-weight="700" fill="#8b581a" '
+                    'stroke="white" stroke-width="3" paint-order="stroke">'
+                    + esc(marker)
+                    + "</text>"
+                )
+            marks.append(chart_link(point, mark))
+        svg.append(
+            f'<path d="{" ".join(path)}" fill="none" stroke="{color}" '
+            f'stroke-width="2" stroke-dasharray="{dash}"/>'
+        )
+        svg += marks
+    # Thin labels only when necessary; every point remains plotted and appears in the table.
+    previous_label = -1000
+    for i, x in enumerate(xs):
+        px = position(x)
+        if i == 0 or i == len(xs) - 1 or (px - previous_label >= 72 and 660 - px >= 72):
+            previous_label = px
+            anchor = "start" if i == 0 else "end" if i == len(xs) - 1 else "middle"
+            svg.append(
+                f'<text x="{px:.1f}" y="222" text-anchor="{anchor}" font-size="11">{x:,}</text>'
+            )
+    if not values:
+        svg.append('<text x="365" y="120" text-anchor="middle" font-size="14">无可用指标</text>')
+    svg.append(
+        '<text x="365" y="250" text-anchor="middle" font-size="12">'
+        + esc(x_label)
+        + "</text></svg>"
+    )
+    return (
+        '<figure class="metric-chart"><figcaption>'
+        + esc(title)
+        + "</figcaption>"
+        + "".join(svg)
+        + "</figure>"
+    )
+
+
+def mode_comparison_charts(rows, agent=False, highlights=None):
+    pairs = {}
+    for row in rows:
+        label = f"{row['input_characters']:,} 字符 · 并发 {row['concurrency']}"
+        if agent:
+            load = row.get("media", {}).get("id", f"{row['input_characters']:,} 字符")
+            label = f"{AGENT_LABELS[row['scenario']]} · {load} · 并发 {row['concurrency']}"
+        pairs.setdefault(label, {})[row["mode"]] = row
+    pairs = {label: modes for label, modes in pairs.items() if set(modes) == set(MODES)}
+    if not pairs:
+        return ""
+    result = []
+    metrics = (
+        [
+            ("e2e", "调用耗时 · E2E P95（秒，越低越好）", "p95"),
+            ("aggregate_output_tps", "聚合输出吞吐（tok/s，越高越好）", "p95"),
+        ]
+        if agent
+        else [
+            ("ttfo", "最终回答等待 · TTFO P50（秒，越低越好）", "p50"),
+            ("output_tps", "单请求输出速率 · P50（tok/s，越高越好）", "p50"),
+        ]
+    )
+    for key, title, quantile in metrics:
+        series = [
+            (
+                MODE_LABELS[mode],
+                [chart_point(pair[mode], key, quantile, highlights) for pair in pairs.values()],
+            )
+            for mode in MODES
+        ]
+        result.append(html_matrix_chart(title, list(pairs), series))
+    return "".join(result)
+
+
+def performance_charts(rows, highlights=None, extra_metrics=()):
+    concurrency = sorted({row["concurrency"] for row in rows})
+    result = []
+    metrics = [
+        ("ttfo", "最终回答等待 · TTFO P95（秒，越低越好）"),
+        ("aggregate_output_tps", "聚合输出吞吐（tok/s，越高越好）"),
+    ]
+    metrics += [
+        (key, label)
+        for key, label in (
+            ("ttft", "首 Token 等待 · TTFT P95（秒，越低越好）"),
+            ("e2e", "请求耗时 · E2E P95（秒，越低越好）"),
+        )
+        if key in extra_metrics
+    ]
+    for key, title in metrics:
+        for start in range(0, len(concurrency), 4):
+            series = [
+                (
+                    f"并发 {level}",
+                    [
+                        (r["input_characters"], chart_point(r, key, highlights=highlights))
+                        for r in rows
+                        if r["concurrency"] == level
+                    ],
+                )
+                for level in concurrency[start : start + 4]
+            ]
+            result.append(html_line_chart(title, series))
+    return "".join(result)
+
+
+CHART_NOTE = (
+    "图中 * / 空心点：含截断、未完成或有效样本少于 3；— / 断线：缺少指标。准确值及样本见明细。"
+)
+
+
+def agent_performance_charts(rows):
+    groups = {}
+    for row in rows:
+        load = row.get("media", {}).get("id", str(row["input_characters"]) + "字")
+        name = ("关闭" if row["mode"] == "off" else "开启") + " · " + load
+        groups.setdefault(name, []).append(
+            (row["concurrency"], chart_point(row, "aggregate_output_tps"))
+        )
+    series = list(groups.items())
+    return "".join(
+        html_line_chart("聚合吞吐（tok/s）· 关闭 / 开启思考", series[i : i + 4], "并发", False)
+        for i in range(0, len(series), 4)
+    )
+
+
+def key_scene_rows(cells):
+    pairs = {}
+    for row in cells:
+        pairs.setdefault((row["input_characters"], row["concurrency"]), {})[row["mode"]] = row
+    shared = [key for key, modes in pairs.items() if set(modes) == set(MODES)]
+    return pairs[min(shared)] if shared else None
+
+
+def key_scene_html(cells):
+    pair = key_scene_rows(cells)
+    if pair is None:
+        return ""
+    esc = html.escape
+    reference = pair["off"]
+    parts = [
+        '<section class="key-scene"><h3>关键场景 · 双模式对照</h3><p class="scene-context">'
+        f"{reference['input_characters']:,} 字符 · 并发 {reference['concurrency']}"
+        ' · 共有的最低负载档位</p><div class="scene-grid">'
+    ]
+    for mode in MODES:
+        row = pair[mode]
+        m = row["metrics"]
+        metrics = [
+            ("最终回答等待 P50", fmt(m["latency_ms"]["ttfo"]["p50"]), "ms"),
+            ("请求耗时 P95", fmt(m["latency_ms"]["e2e"]["p95"]), "ms"),
+            ("单请求输出速率 P50", fmt(m["output_tps"]["p50"]), "tok/s"),
+            ("实际输出 P50", fmt(m["tokens"]["completion_tokens"]["p50"]), "Token"),
+        ]
+        parts += [
+            '<article class="scene-card"><h4>' + MODE_LABELS[mode] + '</h4><p class="scene-budget">'
+            f"输出预算 {row['max_tokens']:,} Token</p><dl>",
+            "".join(
+                "<div><dt>"
+                + label
+                + "</dt><dd>"
+                + esc(value)
+                + " <small>"
+                + unit
+                + "</small></dd></div>"
+                for label, value, unit in metrics
+            ),
+            '</dl><p class="scene-evidence">'
+            f"协议完成 {m['success_count']}/{m['attempted_count']} · 截断 {m['truncated_count']}"
+            f" · 最终回答 {m['final_answer_count']}"
+            + (" · 状态 " + esc(row["status"]) if row["status"] != "completed" else "")
+            + "</p></article>",
+        ]
+    return "".join(parts) + "</div></section>"
+
+
+def anomaly_cards_html(highlights):
+    if not highlights:
+        return "<p>未筛出可比样本中达到 20% 的劣化点；未完成或样本不足的组合不参与判断。</p>"
+    esc = html.escape
+    parts = []
+    for index, item in enumerate(highlights):
+        marker = chr(65 + index)
+        before, current, following = (item[k] for k in ("before", "current", "following"))
+        a, b, c = item["values"]
+        axis = item["axis"]
+        unit = item["unit"]
+        condition = (
+            MODE_LABELS[current["mode"]] + " · " + item["condition"] + " · "
+            f"{before[axis]:,} → {current[axis]:,} {item['axis_unit']}"
+        )
+        if following:
+            recovered = (c <= a) if item["trend"] == "升高" else (c >= a)
+            note = (
+                "下一档恢复至前档水平，局部劣化。"
+                if recovered
+                else "下一档仍差于前档，需复测确认。"
+            )
+        else:
+            note = "缺少下一档完整观测，不能判定持续转折。"
+        parts.append(
+            f'<article class="anomaly-card" id="anomaly-{marker}"><h4>'
+            f'<span class="focus-badge">{marker}</span> ' + esc(condition) + "</h4>"
+            '<div class="anomaly-change"><span>'
+            + esc(item["label"])
+            + "</span><strong>"
+            + esc(item["trend"])
+            + f" {item['change'] * 100:.1f}%</strong></div>"
+            '<div class="anomaly-values">'
+        )
+        for label, row, value in (
+            ("前一档", before, a),
+            ("异常档", current, b),
+            ("下一档", following, c),
+        ):
+            if row is None:
+                parts.append("<div><span>下一档</span><b>—</b></div>")
+                continue
+            target = detail_anchor(row["id"], metric_section(item["metric"]))
+            parts.append(
+                f'<a href="#{target}"><span>{label} · {row[axis]:,} {item["axis_unit"]}</span>'
+                + "<b>"
+                + fmt(value)
+                + " <small>"
+                + unit
+                + "</small></b></a>"
+            )
+        ma, mb = before["metrics"], current["metrics"]
+        parts.append(
+            "</div><p>" + note + '</p><p class="anomaly-evidence">'
+            f"输出预算 {current['max_tokens']:,} Token · 前 / 后样本 "
+            f"{ma['success_count']}/{mb['success_count']}"
+            f" · 截断 {ma['truncated_count']}/{mb['truncated_count']}"
+            f" · 输出 Token P50 {fmt(ma['tokens']['completion_tokens']['p50'])}"
+            f"/{fmt(mb['tokens']['completion_tokens']['p50'])}</p></article>"
+        )
+    return "".join(parts)
+
+
+def report_styles(agent_enabled=False):
+    """Style baseline v1.0: docs/design/bench-report-style/README.md.
+
+    Keep CSS embedded so the standalone script needs no external stylesheet.
+    """
+    style = """
+@page { size: A4 portrait;
+margin: 15mm;
+}
+* { box-sizing: border-box;
+}
+body { margin: 0;
+color: #284960;
+background: #edf2f7;
+font: 10pt/1.65 Arial,"PingFang SC","Microsoft YaHei",sans-serif;
+}
+main { width: 210mm;
+max-width: 100%;
+padding: 15mm;
+margin: 24px auto;
+background: white;
+}
+header { border-bottom: 1px solid #cddde9;
+padding-bottom: 12px;
+color: #2d6089;
+}
+header span { font-weight: normal;
+}
+h1 { font-size: 23pt;
+line-height: 1.3;
+margin: 22px 0 8px;
+}
+h2 { font-size: 15pt;
+color: #2b73a8;
+border-bottom: 1px solid #dce6ee;
+margin: 28px 0 12px;
+padding-bottom: 6px;
+}
+h3 { font-size: 11pt;
+margin: 18px 0 8px;
+}
+h1,h2,h3 { break-after: avoid;
+}
+p { margin: 8px 0;
+overflow-wrap: anywhere;
+orphans: 3;
+widows: 3;
+}
+.summary { display: flex;
+background: #edf7ff;
+border: 1px solid #d0e3f3;
+border-radius: 4px;
+margin: 24px 0;
+padding: 14px 0;
+break-inside: avoid;
+}
+.summary div { flex: 1;
+text-align: center;
+font-size: 9pt;
+border-right: 1px solid #d0e3f3;
+}
+.summary div:last-child { border: 0;
+}
+.summary strong { display: block;
+font-size: 21pt;
+color: #2e80b6;
+}
+.key-scene { break-inside: avoid; margin: 16px 0 22px; }
+.key-scene h3 { margin-bottom: 2px; }
+.scene-context { color: #607c90; font-size: 8.5pt; margin: 0 0 8px; }
+.scene-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 4mm; }
+.scene-card { border: 1px solid #cfe1ee; border-radius: 4px; overflow: hidden; }
+.scene-card h4 { margin: 0; padding: 8px 12px 0; background: #edf6fc; color: #2d6089; }
+.scene-budget { margin: 0; padding: 0 12px 8px; background: #edf6fc; font-size: 8pt; }
+.scene-card dl { margin: 4px 12px; }
+.scene-card dl > div { display: flex; justify-content: space-between; align-items: baseline;
+gap: 2mm; padding: 5px 0; border-bottom: 1px solid #eaf0f5; }
+.scene-card dt { font-size: 8pt; }
+.scene-card dd { margin: 0; font-size: 13pt; color: #286f9f; white-space: nowrap; }
+.scene-card small { font-size: 7.5pt; }
+.scene-evidence { margin: 6px 12px 10px; font-size: 7.5pt; color: #63798a; }
+.anomaly-card { padding: 12px 16px; margin: 10px 0; background: #fffaf1;
+border: 1px solid #e8cf9e; border-left: 3px solid #b77b29; border-radius: 4px;
+break-inside: avoid; scroll-margin-top: 20px; }
+.anomaly-card h4 { margin: 0 0 6px; color: #80541a; font-size: 10pt; }
+.focus-badge { display: inline-block; background: #f6e2bd; color: #80541a;
+font-weight: 700; padding: 0 5px; border-radius: 2px; text-decoration: none; }
+.anomaly-change { display: flex; justify-content: space-between; align-items: baseline; }
+.anomaly-change strong { font-size: 17pt; color: #966019; }
+.anomaly-values { display: grid; grid-template-columns: repeat(3, 1fr); margin: 6px 0; }
+.anomaly-values > * { display: block; padding: 4px 10px; border-right: 1px solid #e8d9be;
+text-decoration: none; color: #775b34; }
+.anomaly-values > :first-child { padding-left: 0; }
+.anomaly-values > :last-child { border: 0; }
+.anomaly-values span { display: block; font-size: 8pt; }
+.anomaly-values b { display: block; font-size: 14pt; }
+.anomaly-values small { font-size: 8pt; font-weight: 400; }
+.anomaly-card p { font-size: 9pt; margin: 4px 0; }
+.anomaly-card .anomaly-evidence { font-size: 8pt; color: #7c6e57; }
+tr[id] { scroll-margin-top: 24px; }
+tr.focus-row td { background: #fff6e5; border-color: #e8d4af; }
+tr:target td { background: #ffe7ad; box-shadow: inset 0 2px #b77b29, inset 0 -2px #b77b29; }
+.anomaly-card:target { outline: 2px solid #b77b29; }
+.metric-chart a { cursor: pointer; }
+.metric-chart a:hover { opacity: .75; }
+a:focus-visible { outline: 2px solid #286f9f; outline-offset: 2px; }
+@media print { .key-scene, .anomaly-card, tr.focus-row { print-color-adjust: exact;
+-webkit-print-color-adjust: exact; } }
+@media screen and (max-width: 500px) { .scene-grid { grid-template-columns: 1fr; }
+.anomaly-values b { font-size: 11pt; } }
+table { border-collapse: collapse;
+table-layout: fixed;
+width: 100%;
+font-size: 8.5pt;
+margin: 12px 0 20px;
+}
+thead { display: table-header-group;
+}
+th,td { padding: 7px 5px;
+border-bottom: 1px solid #dce6ee;
+text-align: left;
+vertical-align: top;
+overflow-wrap: anywhere;
+}
+th { background: #edf6fc;
+color: #2d6089;
+font-weight: 600;
+}
+tr { break-inside: avoid;
+}
+.model-review { margin-top: 28px; }
+.model-review > h2 { margin-bottom: 6px; }
+.review-subtitle { color: #637e93; margin: 0 0 20px; }
+.review-rating { display: flex; align-items: center; justify-content: space-between;
+gap: 5mm; padding: 4mm 5mm; margin: 3mm 0;
+background: #edf6fd; border: 1px solid #d1e3f0; border-radius: 4px;
+break-inside: avoid; }
+.review-eyebrow { display: block; color: #52728b; font-size: 9pt; }
+.review-rating strong { display: block; color: #226b9f;
+font-size: 31pt; line-height: 1.5; letter-spacing: 2px; }
+.review-rating p { text-align: right; color: #345e7e; font-size: 10pt; }
+.review-rating p span { font-size: 8pt; color: #61778a; }
+.review-notice { padding: 2.5mm 3mm; border-left: 2px solid #86b7dc;
+background: #f2f7fb; font-size: 9pt; break-inside: avoid; }
+.review-warning { padding: 2.5mm 3mm; border-left: 2px solid #c78838;
+background: #fff8ed; color: #85591e; break-inside: avoid; }
+.review-section { margin-top: 4mm; }
+.review-section h3 { font-size: 10.5pt; line-height: 1.7; margin: 0 0 1.5mm; }
+.review-number { color: #2b73a8; font-weight: 700; margin-right: 2mm; }
+.review { white-space: pre-wrap; overflow-wrap: anywhere;
+font-size: 9.5pt; line-height: 1.8; orphans: 3; widows: 3; }
+.review-meta { font-size: 8pt; color: #587084; border-top: 1px solid #dbe6ee;
+margin-top: 5mm; padding-top: 3mm; }
+.review-meta p { margin: 1mm 0; }
+@media print { .model-review { break-before: page; margin-top: 0; }
+.model-review > h2 { break-before: auto; } }
+@media screen and (max-width: 500px) { .review-rating { flex-wrap: wrap; }
+.review-rating p { text-align: left; } }
+.metric-chart { margin: 14px 0 20px; break-inside: avoid; }
+.metric-chart figcaption { font-size: 10pt; font-weight: 600; color: #284960; }
+.metric-chart svg { display: block; width: 100%; height: auto;
+font-family: inherit; fill: #284960; }
+footer { margin-top: 24px;
+padding-top: 12px;
+border-top: 1px solid #dce6ee;
+font-size: 9pt;
+}
+a { color: #2b73a8;
+}
+@media print { body { background: white;
+} main { width: auto;
+max-width: none;
+margin: 0;
+padding: 0;
+} h2 { break-before: page;
+} .summary + h2 { break-before: auto;
+} }
+@media screen and (max-width: 700px) { main { padding: 5vw;
+margin: 0;
+} table { font-size: 8pt;
+} }
+"""
+    if agent_enabled:
+        style += (
+            "\n@media print { h2 { break-before: auto; } .agent-title { break-before: page; } }\n"
+        )
+    return style
 
 
 def render_html_report(summary):
@@ -1948,6 +2748,8 @@ def render_html_report(summary):
 
     config = summary["config"]
     cells = summary["cells"]
+    highlights = performance_highlights(summary)
+    markers = highlight_labels(highlights)
 
     def pair(dist):
         return fmt(dist["p50"]) + " / " + fmt(dist["p95"])
@@ -1970,8 +2772,13 @@ def render_html_report(summary):
         "<div><strong>"
         + str(sum(row["metrics"]["unresolved_count"] for row in cells))
         + "</strong>未决性能请求</div></div>",
-        "<h2>测试条件与模式验证</h2>",
+        "<h2>关键结论</h2>",
     ]
+    parts += [
+        "<ul>" + "".join("<li>" + esc(v) + "</li>" for v in report_conclusions(summary)) + "</ul>"
+    ]
+    parts += [key_scene_html(cells), "<h3>性能变化分析</h3>", anomaly_cards_html(highlights)]
+    parts.append("<h2>测试条件与模式验证</h2>")
     adapter = summary.get("thinking_adapter")
     parts.append(
         html_table(
@@ -2095,6 +2902,7 @@ def render_html_report(summary):
                 "出长度、模式验证及固定执行顺序均需一起解释。"
             ),
         ]
+        parts += [mode_comparison_charts(cells, highlights=markers)]
         lookup = {
             (row["mode"], row["input_characters"], row["concurrency"]): row["metrics"]
             for row in cells
@@ -2139,6 +2947,8 @@ def render_html_report(summary):
             "<h2>" + MODE_LABELS[mode] + " · 性能明细</h2>",
             paragraph("延迟单位 ms，速率 tok/s，TPOT ms/Token；分位数依次为 P50 / P95。"),
         ]
+        extras = {item["metric"] for item in highlights if item["current"]["mode"] == mode}
+        parts += [performance_charts(rows, markers, extras)]
         parts.append(
             html_table(
                 ["字符", "并发", "状态", "发起 / 成功 / 未决", "成功率", "TTFT", "TTFO", "E2E"],
@@ -2156,6 +2966,8 @@ def render_html_report(summary):
                     + [pair(r["metrics"]["latency_ms"][key]) for key in ("ttft", "ttfo", "e2e")]
                     for r in rows
                 ],
+                sources=[r["id"] for r in rows],
+                highlights=markers,
             )
         )
         parts.append("<h3>输出速率与服务端 Token</h3>")
@@ -2184,6 +2996,9 @@ def render_html_report(summary):
                     ]
                     for r in rows
                 ],
+                sources=[r["id"] for r in rows],
+                section="output",
+                highlights=markers,
             )
         )
         parts.append("<h3>证据完整性</h3>")
@@ -2214,6 +3029,9 @@ def render_html_report(summary):
                     ]
                     for r in rows
                 ],
+                sources=[r["id"] for r in rows],
+                section="evidence",
+                highlights=markers,
             )
         )
         for row in rows:
@@ -2240,28 +3058,12 @@ def render_html_report(summary):
             ]
             levels.append(f"{size} 字符：{max(successes) if successes else '无'}")
         parts.append(paragraph("最高全部请求协议成功的已测并发：" + "；".join(levels) + "。"))
-    parts += ["<h2>性能变化分析</h2>"] + [
-        paragraph(value) for value in performance_observations(summary)
-    ]
     parts += render_agent_html(summary.get("agent_performance"))
     if config["self_review"]:
-        # Reuse status/rating wording; model prose remains escaped plain text.
-        lines = render_self_review(summary.get("self_review", {"status": "not_run"}))
-        parts.append("<h2>模型自评</h2>")
-        fence = None
-        body = []
-        for line in lines:
-            if fence is not None:
-                if line == fence:
-                    parts.append('<div class="review">' + esc("\n".join(body)) + "</div>")
-                    fence = None
-                else:
-                    body.append(line)
-            elif re.fullmatch(r"`{3,}text", line):
-                fence = line[:-4]
-            elif line and not line.startswith("## "):
-                parts.append(paragraph(line.replace("**", "")))
-    parts += ["<h2>测量口径与附录</h2>"] + [paragraph(note) for note in measurement_notes(summary)]
+        parts += render_self_review_html(summary.get("self_review", {"status": "not_run"}))
+    parts += ["<h2>测量口径与附录</h2>", paragraph(CHART_NOTE)] + [
+        paragraph(note) for note in measurement_notes(summary)
+    ]
     if summary.get("agent_performance"):
         parts += [paragraph(note) for note in AGENT_NOTES]
     parts.append(
@@ -2269,118 +3071,7 @@ def render_html_report(summary):
         + SUPPORT_URL
         + '">打开支持页面</a>，请作者喝一杯瑞幸咖啡。支持全凭自愿，不影响任何功能的使用。</footer>'
     )
-    style = """
-@page { size: A4 portrait;
-margin: 15mm;
-}
-* { box-sizing: border-box;
-}
-body { margin: 0;
-color: #284960;
-background: #edf2f7;
-font: 10pt/1.65 Arial,"PingFang SC","Microsoft YaHei",sans-serif;
-}
-main { width: 210mm;
-max-width: 100%;
-padding: 15mm;
-margin: 24px auto;
-background: white;
-}
-header { border-bottom: 1px solid #cddde9;
-padding-bottom: 12px;
-color: #2d6089;
-}
-header span { font-weight: normal;
-}
-h1 { font-size: 23pt;
-line-height: 1.3;
-margin: 22px 0 8px;
-}
-h2 { font-size: 15pt;
-color: #2b73a8;
-border-bottom: 1px solid #dce6ee;
-margin: 28px 0 12px;
-padding-bottom: 6px;
-}
-h3 { font-size: 11pt;
-margin: 18px 0 8px;
-}
-h1,h2,h3 { break-after: avoid;
-}
-p { margin: 8px 0;
-overflow-wrap: anywhere;
-orphans: 3;
-widows: 3;
-}
-.summary { display: flex;
-background: #edf7ff;
-border: 1px solid #d0e3f3;
-border-radius: 4px;
-margin: 24px 0;
-padding: 14px 0;
-break-inside: avoid;
-}
-.summary div { flex: 1;
-text-align: center;
-font-size: 9pt;
-border-right: 1px solid #d0e3f3;
-}
-.summary div:last-child { border: 0;
-}
-.summary strong { display: block;
-font-size: 21pt;
-color: #2e80b6;
-}
-table { border-collapse: collapse;
-table-layout: fixed;
-width: 100%;
-font-size: 8.5pt;
-margin: 12px 0 20px;
-}
-thead { display: table-header-group;
-}
-th,td { padding: 7px 5px;
-border-bottom: 1px solid #dce6ee;
-text-align: left;
-vertical-align: top;
-overflow-wrap: anywhere;
-}
-th { background: #edf6fc;
-color: #2d6089;
-font-weight: 600;
-}
-tr { break-inside: avoid;
-}
-.review { white-space: pre-wrap;
-overflow-wrap: anywhere;
-line-height: 1.8;
-orphans: 3;
-widows: 3;
-}
-footer { margin-top: 24px;
-padding-top: 12px;
-border-top: 1px solid #dce6ee;
-font-size: 9pt;
-}
-a { color: #2b73a8;
-}
-@media print { body { background: white;
-} main { width: auto;
-max-width: none;
-margin: 0;
-padding: 0;
-} h2 { break-before: page;
-} .summary + h2 { break-before: auto;
-} }
-@media screen and (max-width: 700px) { main { padding: 5vw;
-margin: 0;
-} table { font-size: 8pt;
-} }
-"""
-    if summary.get("agent_performance"):
-        style += (
-            "\n@media print { h2 { break-before: auto; } .agent-title { break-before: page; } }\n"
-        )
+    style = report_styles(bool(summary.get("agent_performance")))
     return (
         '<!doctype html>\n<html lang="zh-CN"><head><meta charset="utf-8">'
         '<meta name="viewport" content="width=device-width,initial-scale=1">'
@@ -2653,6 +3344,7 @@ def validate_agent(raw, *, frozen=False):
         raw,
         {
             "enabled",
+            "output_tokens",
             "scenarios",
             "concurrency",
             "repetitions",
@@ -2729,6 +3421,13 @@ def validate_agent(raw, *, frozen=False):
         "media_samples": [],
         "targets": {},
     }
+    # Historical snapshots retain their recorded inherited budget and plan.
+    if not frozen or "output_tokens" in raw:
+        outputs = raw.get("output_tokens", {"off": 4096, "on": 16384})
+        check_keys(outputs, MODES, MODES, "agent output_tokens")
+        result["output_tokens"] = {
+            mode: integer(outputs[mode], 1, 65536, "agent output_tokens") for mode in MODES
+        }
     if "session_timeout_seconds" in loop:
         value = loop["session_timeout_seconds"]
         if type(value) not in (float, int) or not math.isfinite(value) or not 0 < value <= 86400:
@@ -2924,7 +3623,7 @@ def make_agent_plan(config):
                         "input_characters": size,
                         "concurrency": concurrency,
                         "repetitions": agent["repetitions"],
-                        "max_tokens": config["output_tokens"][mode],
+                        "max_tokens": agent.get("output_tokens", config["output_tokens"])[mode],
                         "source": "specialty",
                     }
                     if not isinstance(load, int):
@@ -2939,6 +3638,7 @@ def make_agent_plan(config):
                         scenario == "long_context"
                         and key in baseline
                         and baseline[key]["repetitions"] == cell["repetitions"]
+                        and baseline[key]["max_tokens"] == cell["max_tokens"]
                     ):
                         cell.update(source="baseline_reference", baseline_cell_id=key)
                     cells.append(cell)
@@ -2979,6 +3679,7 @@ def make_agent_plan(config):
     )
     return {
         "schema_version": AGENT_VERSION,
+        **({"output_tokens": dict(agent["output_tokens"])} if "output_tokens" in agent else {}),
         "formula_version": "agent-client/v1",
         "rule_version": "agent-rules/v1",
         "cells": cells,
@@ -3911,6 +4612,60 @@ def agent_observations(report, config):
     return observations
 
 
+def agent_highlights(agent):
+    """One strongest comparable change per scenario; full observations stay in summary.json."""
+    lookup = {r["id"]: r for r in agent["cells"]}
+    candidates = []
+    for item in agent["observations"]:
+        if item["kind"] not in ("degradation", "loop"):
+            continue
+        evidence = item["evidence"]
+        before, after = evidence.get("before"), evidence.get("after")
+        if not before or after is None:
+            continue
+        change = abs(after / before - 1)
+        if item["kind"] == "loop" and after / before < 1.2:
+            continue
+        row = lookup[item["cell_ids"][-1]]
+        text = item["text"]
+        if item["kind"] == "degradation":
+            # The rule's numeric transition is retained, repeated caveats are consolidated.
+            text = text.split("，达到 20%")[0] + "。"
+            text = text.replace("input_characters", "输入字符").replace("concurrency", "并发")
+            for source, label in (
+                ("ttft_p95", "TTFT P95"),
+                ("ttfo_p95", "TTFO P95"),
+                ("e2e_p95", "E2E P95"),
+                ("aggregate_output_tps", "聚合吞吐"),
+            ):
+                text = text.replace(source, label)
+            a, b = (lookup[key] for key in item["cell_ids"])
+            condition = (
+                f"并发 {b['concurrency']}"
+                if a["input_characters"] != b["input_characters"]
+                else f"输入 {b['input_characters']} 字符"
+            )
+            if b.get("media"):
+                condition += "，" + b["media"]["id"]
+            text = text.replace("：", f"，{condition}：", 1)
+            persistence = (
+                item["text"].split("达到 20% 劣化关注阈值。")[-1].split(" 两档成功样本")[0]
+            )
+            text += persistence
+            text += f"样本 {a['metrics']['success_count']}/{b['metrics']['success_count']}。"
+        else:
+            text = text.split("。", 1)[0] + "。"
+        candidates.append((change, row["scenario"], text))
+    selected, scenarios = [], set()
+    for _, scenario, text in sorted(candidates, key=lambda x: -x[0]):
+        if scenario not in scenarios:
+            selected.append(text)
+            scenarios.add(scenario)
+        if len(selected) == 3:
+            break
+    return selected
+
+
 def agent_report_blocks(agent):
     """Both renderers consume identical tables, captions and rule conclusions."""
     blocks = []
@@ -3918,10 +4673,37 @@ def agent_report_blocks(agent):
     def paragraph(text):
         blocks.append({"type": "paragraph", "text": text})
 
-    def table(headers, rows):
-        blocks.append({"type": "table", "headers": headers, "rows": rows})
+    def table(headers, rows, sources=None, section="latency"):
+        blocks.append(
+            {
+                "type": "table",
+                "headers": headers,
+                "rows": rows,
+                "sources": sources,
+                "section": section,
+            }
+        )
 
+    blocks.append({"type": "heading", "text": "专项总结"})
+    highlights = agent_highlights(agent)
+    for text in highlights:
+        paragraph(text)
+    # Failures and coverage gaps must remain visible even when trend prose is condensed.
+    critical = [x for x in agent["observations"] if x["kind"] in ("execution", "coverage")]
+    if critical:
+        table(["需关注的执行与证据问题"], [[x["text"]] for x in critical])
+    if not highlights and not critical:
+        paragraph("本次未筛出可比样本中达到 20% 的劣化点。")
     plan = agent["plan"]
+    if "output_tokens" in plan:
+        modes = [mode for mode in MODES if any(c["mode"] == mode for c in plan["cells"])]
+        paragraph(
+            "专项每次模型调用输出上限（含思考）："
+            + "；".join(
+                f"{MODE_LABELS[mode]} {plan['output_tokens'][mode]} Token" for mode in modes
+            )
+            + "。"
+        )
     paragraph(
         f"新增性能请求上限 {plan['additional_performance_requests_max']}；引"
         f"用常规请求 {plan['referenced_requests']}"
@@ -3930,25 +4712,26 @@ def agent_report_blocks(agent):
         f"/{plan['warmup_requests_max']}。实际新增请求 {agent['additional_attempted_requests']}"
         f"，观测峰值在途请求 {agent['peak_inflight_requests']}。"
     )
-    priority = {
-        "execution": 0,
-        "degradation": 1,
-        "loop": 2,
-        "scaling": 3,
-        "thinking": 4,
-        "target": 5,
-        "coverage": 6,
-        "truncated": 7,
-    }
-    observations = sorted(agent["observations"], key=lambda x: priority[x["kind"]])
-    blocks.append({"type": "heading", "text": "专项总结"})
-    for item in observations[:5]:
-        paragraph(item["text"])
     for scenario in AGENT_SCENARIOS:
         rows = [x for x in agent["cells"] if x["scenario"] == scenario]
         if not rows:
             continue
         blocks.append({"type": "heading", "text": AGENT_LABELS[scenario]})
+        blocks.append({"type": "scenario_chart", "rows": rows})
+        targets = [
+            [
+                f"{MODE_LABELS[r['mode']]} / {r.get('media', {}).get('id', r['input_characters'])}"
+                f" / 并发 {r['concurrency']}",
+                c["metric"],
+                fmt(c["actual"]),
+                fmt(c["target"]),
+                c["result"],
+            ]
+            for r in rows
+            for c in r["target_checks"]
+        ]
+        if targets:
+            table(["模式 / 负载 / 并发", "目标指标", "实际", "目标", "结论"], targets)
         if scenario == "loop" and rows[0].get("tool_choice"):
             paragraph(
                 "工具调用方式："
@@ -3964,6 +4747,7 @@ def agent_report_blocks(agent):
             "E2E P95 ms",
         ]
         values = []
+        seen_media = set()
         for row in rows:
             m = row["metrics"]
             load = row.get("media", {}).get("id", str(row["input_characters"]) + " 字符")
@@ -3976,7 +4760,7 @@ def agent_report_blocks(agent):
                     *[fmt(m["latency_ms"][key]["p95"]) for key in ("ttft", "ttfo", "e2e")],
                 ]
             )
-        table(headers, values)
+        table(headers, values, sources=[r["id"] for r in rows])
         table(
             [
                 "模式 / 负载 / 并发",
@@ -4003,11 +4787,14 @@ def agent_report_blocks(agent):
                 ]
                 for r in rows
             ],
+            sources=[r["id"] for r in rows],
+            section="output",
         )
         for row in rows:
             m = row["metrics"]
-            if row.get("media"):
+            if row.get("media") and row["media"]["id"] not in seen_media:
                 meta = row["media"]
+                seen_media.add(meta["id"])
                 paragraph(
                     f"{meta['id']}：{meta['format']}，{meta['count']} 份 × {meta['bytes']} bytes；"
                     + (
@@ -4042,6 +4829,29 @@ def agent_report_blocks(agent):
                 + fmt(m["session_tokens"]["cached_tokens"]["p50"])
                 + "。"
             )
+            points = [
+                (
+                    x["turn"],
+                    chart_point(
+                        {
+                            "id": f"{row['id']}:turn-{x['turn']}",
+                            "status": row["status"],
+                            "metrics": x["metrics"],
+                        },
+                        "tool_ready_ms",
+                    ),
+                )
+                for x in row["rounds"]
+                if x["output_type"] == "tool"
+            ]
+            if len(points) >= 2:
+                blocks.append(
+                    {
+                        "type": "chart",
+                        "text": "工具调用就绪时间 P95（ms）随轮次变化",
+                        "points": points,
+                    }
+                )
             table(
                 [
                     "轮次 / 输出",
@@ -4064,39 +4874,9 @@ def agent_report_blocks(agent):
                     ]
                     for x in row["rounds"]
                 ],
+                sources=[f"{row['id']}:turn-{x['turn']}" for x in row["rounds"]],
+                section="loop",
             )
-            points = [
-                (x["turn"], x["metrics"]["tool_ready_ms"]["p95"])
-                for x in row["rounds"]
-                if x["output_type"] == "tool" and x["metrics"]["tool_ready_ms"]["p95"] is not None
-            ]
-            if len(points) >= 2:
-                blocks.append(
-                    {
-                        "type": "chart",
-                        "text": "工具调用就绪时间 P95（ms）随轮次变化",
-                        "points": points,
-                    }
-                )
-        for mode in MODES:
-            group = [r for r in rows if r["mode"] == mode]
-            for size in [max(r["input_characters"] for r in group)] if group else []:
-                subset = [r for r in group if r["input_characters"] == size and "media" not in r]
-                points = [
-                    (r["concurrency"], r["metrics"]["aggregate_output_tps"])
-                    for r in subset
-                    if r["metrics"]["aggregate_output_tps"] is not None
-                ]
-                if len(points) >= 2:
-                    blocks.append(
-                        {
-                            "type": "chart",
-                            "text": f"{MODE_LABELS[mode]} · 输"
-                            f"入 {size} 字符 · 聚合 tok/s "
-                            f"随并发变化",
-                            "points": points,
-                        }
-                    )
     pairs = {}
     for row in agent["cells"]:
         key = (
@@ -4123,14 +4903,11 @@ def agent_report_blocks(agent):
     if comparisons:
         blocks.append({"type": "heading", "text": "思考模式对照"})
         paragraph("各列依次为关闭/开启思考；输出预算和实际生成长度须一起比较。")
+        blocks.append({"type": "comparison_chart", "rows": agent["cells"]})
         table(
             ["场景 / 负载 / 并发", "输出预算", "E2E P95 ms", "聚合 tok/s", "输出 Token P50"],
             comparisons,
         )
-    if len(observations) > 5:
-        blocks.append({"type": "heading", "text": "补充分析"})
-        for item in observations[5:]:
-            paragraph(item["text"])
     bad = [x for x in agent["preparation"] if x["status"] != "success"]
     if bad:
         blocks.append({"type": "heading", "text": "预检与预热结果"})
@@ -4172,44 +4949,21 @@ def render_agent_html(agent):
             tag = "h3" if kind == "heading" else "p"
             parts.append(f"<{tag}>" + html.escape(block["text"]) + f"</{tag}>")
         elif kind == "table":
-            parts.append(html_table(block["headers"], block["rows"]))
-        elif kind == "chart":
-            points = sorted(block["points"])
-            top = max(y for _, y in points) or 1
-            left, right = min(x for x, _ in points), max(x for x, _ in points)
-            coords = [
-                (50 + (x - left) * 510 / max(1, right - left), 155 - y * 115 / top)
-                for x, y in points
-            ]
-            marks = " ".join(f"{x:.1f},{y:.1f}" for x, y in coords)
-            svg = (
-                (
-                    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 620'
-                    ' 200" role="img" style="width:100%;max-height:42mm;break'
-                    '-inside:avoid"><title>'
-                )
-                + html.escape(block["text"])
-                + (
-                    '</title><path d="M50 30 V155 H585" stroke="#8096a5" fill'
-                    '="none"/><polyline points="'
-                )
-                + marks
-                + '" stroke="#2b73a8" stroke-width="2" fill="none"/>'
-            )
-            for (label, value), (x, y) in zip(points, coords):
-                svg += (
-                    f'<circle cx="{x:.1f}" cy="{y:.1f}" r="3" fill="#2b73a8"/>'
-                    f'<text x="{x:.1f}" y="180" text-anchor="middle" font-size'
-                    f'="11">{label}</text><text x="{x:.1f}" y="{y - 9:.1f}" te'
-                    f'xt-anchor="middle" font-size="10">{value:.1f}</text>'
-                )
             parts.append(
-                '<figure style="margin:12px 0;break-inside:avoid"><figcaption>'
-                + html.escape(block["text"])
-                + "</figcaption>"
-                + svg
-                + "</svg></figure>"
+                html_table(
+                    block["headers"],
+                    block["rows"],
+                    sources=block["sources"],
+                    section=block["section"],
+                )
             )
+        elif kind == "scenario_chart":
+            parts.append(agent_performance_charts(block["rows"]))
+        elif kind == "comparison_chart":
+            parts.append(mode_comparison_charts(block["rows"], agent=True))
+        elif kind == "chart":
+            series = [("工具就绪", block["points"])]
+            parts.append(html_line_chart(block["text"], series, "工具轮次", False))
     return parts
 
 

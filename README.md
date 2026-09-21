@@ -8,7 +8,7 @@
 
 **Python 3.9+ · 零第三方运行依赖 · MIT · Author: William Xu**
 
-[下载 1.10.1（GitHub）](https://github.com/Siriuser/inferpulse-bench/releases/tag/v1.10.1) · [下载 1.10.1（Gitee）](https://gitee.com/xum1983/inferpulse-bench/releases/tag/v1.10.1) · [使用说明](使用说明.md) · [报告问题](https://github.com/Siriuser/inferpulse-bench/issues)
+[下载 1.10.2（GitHub）](https://github.com/Siriuser/inferpulse-bench/releases/tag/v1.10.2) · [下载 1.10.2（Gitee）](https://gitee.com/xum1983/inferpulse-bench/releases/tag/v1.10.2) · [使用说明](使用说明.md) · [报告问题](https://github.com/Siriuser/inferpulse-bench/issues)
 
 ## 可以测什么
 
@@ -17,10 +17,10 @@
 | 常规性能 | TTFT、TTFO、请求耗时、单请求与聚合 tok/s、服务返回的 Token 用量 |
 | 长上下文与并发 | 字符档位 × 并发 × 思考模式矩阵，P50/P95、成功率、失败与截断、劣化位置和文字分析 |
 | 思考模式对照 | 参数方案、模式证据、off/on 数据对照；支持 Qwen 与 DeepSeek 兼容参数方案 |
-| Agent 性能（1.10.1） | 常规基线引用、缺档补测、并发工具 Loop、逐轮工具就绪时间、完整流程耗时及可选 PNG/WAV 输入 |
+| Agent 性能（1.10.2） | 常规基线引用、缺档补测、并发工具 Loop、逐轮工具就绪时间、完整流程耗时及可选 PNG/WAV 输入 |
 | 报告与复核 | MD/HTML 默认同时生成，HTML 平铺展示与 A4/PDF 打印，证据离线重建，可选模型自评 |
 
-Agent 专项默认关闭，不要求开启 Thinking，单独统计并在报告中形成“Agent 能力评估”。流程完成与性能数据不代表业务答案质量。当前版本为 1.10.1。
+Agent 专项默认关闭；每次调用默认配额 off=4096 / on=16384 Token，不影响常规测试，且更高配额不保证没有截断。不要求开启 Thinking，单独统计并在报告中形成“Agent 能力评估”。流程完成与性能数据不代表业务答案质量。当前版本为 1.10.2。
 
 ## 快速开始
 
@@ -65,19 +65,22 @@ Windows 可将 `python3` 替换为 `python`。无需安装依赖，不需要云�
 ```jsonc
 "agent_performance": {
   "enabled": true,
+  "output_tokens": {"off": 4096, "on": 16384},
   "scenarios": ["long_context", "loop"],
   "concurrency": [1, 5, 10],
   "repetitions": 3
 }
 ```
 
-默认测 8192 / 32768 / 65536 / 131072 字符长输入，以及每会话 10 次模型调用的固定工具 Loop。符合条件的常规单轮结果只引用，缺档补测；工具 Loop 和图片/音频须独立实测。默认双模式与常规矩阵下最多新增 1084 次模型请求，先用 `--dry-run` 核对规模；入门试跑建议缩小档位、并发和轮数。
+默认测 8192 / 32768 / 65536 / 131072 字符长输入，以及每会话 10 次模型调用的固定工具 Loop。符合条件的常规单轮结果只引用，缺档补测；工具 Loop 和图片/音频须独立实测。默认双模式与常规矩阵下最多新增 1384 次模型请求，先用 `--dry-run` 核对规模；入门试跑建议缩小档位、并发和轮数。
 
-`loop.tool_choice` 默认 `named`（指定固定工具），也可显式设为 `auto`；不会失败后自动切换。1.10.1 使用严格必填参数和明确收尾指令，并检查输出预算，只有完整有效的工具调用才会执行。
+`loop.tool_choice` 默认 `named`（指定固定工具），也可显式设为 `auto`；不会失败后自动切换。1.10.2 使用严格必填参数和明确收尾指令，并检查输出预算，只有完整有效的工具调用才会执行。
 
 报告提供数值表、逐轮趋势、思考对照、20% 描述性劣化关注点及可选业务目标对照。缺 usage 或窗口未决时不伪造吞吐；工具参数不冒充最终回答，不执行模型生成的命令或外部工具。
 
 [专项配置与指标定义](docs/AGENT_PERFORMANCE.md) · [完整使用说明](使用说明.md)
+
+[1.10.2 更新记录](CHANGELOG.md) · [报告样式规范 1.0](docs/design/bench-report-style/README.md)
 
 ## 报告预览与格式
 
@@ -85,7 +88,7 @@ Windows 可将 `python3` 替换为 `python`。无需安装依赖，不需要云�
 
 ![报告首页](report.preview.png)
 
-仓库示例是使用合成数据的 12 页设计原型，不是模型性能成绩；实际报告随运行数据生成，页数可变。1.10.1 的 Agent 动态报告已完成 Chrome A4 长表及真实失败结果打印检查，曲线为内联 SVG，无需外部资源。打印时使用 A4 纵向、100% 比例，并关闭浏览器额外页眉页脚。
+仓库示例是使用合成数据的 12 页设计原型，不是模型性能成绩；实际报告随运行数据生成，页数可变。1.10.2 动态报告结论前置、图先表后，增加双模式核心指标卡、A/B/C 异常卡及图表定位数据行。模型自评采用独立档位卡与编号正文。样式已建立自动基线；本版完整 A4 分页视觉验收仍待完成，不能沿用旧版打印结果。曲线为内联 SVG，无需外部资源。打印时使用 A4 纵向、100% 比例，并关闭浏览器额外页眉页脚。
 
 ```jsonc
 "report_formats": [
@@ -112,9 +115,9 @@ python3 llm_benchmark.py report --input llm_benchmark_evidence_实际目录
 
 ## 验证与贡献
 
-Python 3.9 / 3.13 各 118 项本机模拟服务回归通过。真实 Qwen3.6-35B-A3B / vLLM 0.25.1 部署的 named 工具闭环，在 Thinking off/on、并发 1/5、每组 3 轮、每会话 5 次调用、原预算 1024/4096 Token 下，重启后的 MTP 开启32K、关闭8K、关闭32K三轮均完成 36/36 条正式会话，独立审计和离线重建通过。32K 两轮配置和首轮输入哈希一致；服务端 FSM 错误分别为 28/0/0，不能据此证明历史失败原因。
+Python 3.9 / 3.13 各 131 项本机模拟服务回归通过。真实 Qwen3.6-35B-A3B / vLLM 0.25.1 部署的 named 工具闭环，在 Thinking off/on、并发 1/5、每组 3 轮、每会话 5 次调用、原预算 1024/4096 Token 下，重启后的 MTP 开启32K、关闭8K、关闭32K三轮均完成 36/36 条正式会话，独立审计和离线重建通过。32K 两轮配置和首轮输入哈希一致；服务端 FSM 错误分别为 28/0/0，不能据此证明历史失败原因。
 
-此前 auto/8K 与 named/32K 各有一次预算耗尽、仅完成 35/36 会话，失败记录保留。单轮通过不代表长期稳定性，真实图片/音频兼容性和业务答案质量未验证。详见 [Agent 专项说明](docs/AGENT_PERFORMANCE.md)。
+此前 auto/8K 与 named/32K 各有一次预算耗尽、仅完成 35/36 会话，失败记录保留。单轮通过不代表长期稳定性，后续固定 PNG 输入在一个部署中完成 72/72 次正常结束；这不证明图片理解准确率。该部署的音频输入被服务拒绝，未进行音频性能测试；其他模型/服务需单独验证。详见 [Agent 专项说明](docs/AGENT_PERFORMANCE.md)。
 
 ```bash
 python3 -m unittest discover -s tests -p 'test_standalone*benchmark.py'

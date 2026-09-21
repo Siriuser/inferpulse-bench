@@ -27,6 +27,7 @@ def agent_config(url="http://127.0.0.1:1/v1/chat/completions", scenarios=None):
     config.update(input_characters=[128], concurrency=[1, 2], thinking_modes=["off"], repetitions=1)
     config["agent_performance"] = {
         "enabled": True,
+        "output_tokens": dict(config["output_tokens"]),
         "scenarios": scenarios or ["long_context", "loop"],
         "concurrency": [1, 2],
         "repetitions": 1,
@@ -105,6 +106,14 @@ class AgentConfigurationTests(unittest.TestCase):
             }
         )
         plan = bench.make_agent_plan(config)
+        self.assertEqual(config["agent_performance"]["output_tokens"], {"off": 4096, "on": 16384})
+        self.assertEqual(plan["referenced_requests"], 0)
+        self.assertEqual(plan["additional_performance_requests_max"], 1344)
+        self.assertEqual(plan["total_additional_requests_max"], 1356)
+        config["warmup"]["enabled"] = True
+        self.assertEqual(bench.make_agent_plan(config)["total_additional_requests_max"], 1384)
+        config["agent_performance"]["output_tokens"] = dict(config["output_tokens"])
+        plan = bench.make_agent_plan(config)
         self.assertEqual(plan["referenced_requests"], 288)
         self.assertEqual(plan["additional_performance_requests_max"], 1056)
         self.assertEqual(plan["additional_sessions_max"], 96)
@@ -122,11 +131,76 @@ class AgentConfigurationTests(unittest.TestCase):
             {"enabled": True, "loop": {"tool_choice": "required"}},
             {"enabled": True, "loop": {"tool_choice": {}}},
             {"enabled": True, "targets": {"loop": {"min_success_rate": 2}}},
+            {"enabled": True, "output_tokens": {"off": 4096}},
+            {"enabled": True, "output_tokens": {"off": True, "on": 16384}},
+            {"enabled": True, "output_tokens": {"off": 0, "on": 16384}},
+            {"enabled": True, "output_tokens": {"off": 4096, "on": 65537}},
+            {"enabled": True, "output_tokens": {"off": 4096, "on": 16384, "other": 1}},
         ):
             config = config_for()
             config["agent_performance"] = fragment
             with self.subTest(fragment=fragment), self.assertRaises(bench.BenchmarkError):
                 bench.validate_config(config)
+
+    def test_budget_matching_is_per_mode(self):
+        config = agent_config(scenarios=["long_context"])
+        config["thinking_modes"] = ["off", "on"]
+        config["agent_performance"]["output_tokens"]["on"] = 16384
+        plan = bench.make_agent_plan(config)
+        matching = [c for c in plan["cells"] if c["input_characters"] == 128]
+        self.assertTrue(
+            all(c["source"] == "baseline_reference" for c in matching if c["mode"] == "off")
+        )
+        self.assertTrue(all(c["source"] == "specialty" for c in matching if c["mode"] == "on"))
+        self.assertTrue(
+            all(c["max_tokens"] == 16384 for c in plan["preparations"] if c["mode"] == "on")
+        )
+
+    def test_historical_frozen_budget_keeps_inherited_plan(self):
+        config = agent_config(scenarios=["long_context"])
+        config["agent_performance"].pop("output_tokens")
+        frozen = bench.validate_config(config, resolve_adapter=False)
+        self.assertNotIn("output_tokens", frozen["agent_performance"])
+        plan = bench.make_agent_plan(frozen)
+        self.assertNotIn("output_tokens", plan)
+        self.assertGreater(plan["referenced_requests"], 0)
+        self.assertTrue(
+            all(c["max_tokens"] == config["output_tokens"][c["mode"]] for c in plan["cells"])
+        )
+
+    def test_independent_budget_reaches_all_agent_phases_and_loop_turns(self):
+        with tempfile.TemporaryDirectory() as temp, LocalServer(agent_response) as server:
+            config = agent_config(server.url)
+            config["thinking_modes"] = ["off", "on"]
+            config["warmup"] = {"enabled": True, "requests_per_length": 1}
+            config["agent_performance"]["concurrency"] = [1]
+            config["agent_performance"]["output_tokens"] = {"off": 4096, "on": 16384}
+            baseline_plan = bench.make_cells(config)
+            directory = Path(temp) / "e"
+            summary = run(config, directory)
+            self.assertEqual(bench.make_cells(config), baseline_plan)
+            records = [
+                json.loads(x) for x in (directory / "agent_requests.jsonl").read_text().splitlines()
+            ]
+            results = [r["request"] for r in records if r["record_type"] == "result"]
+            self.assertEqual({r["phase"] for r in results}, {"preflight", "warmup", "performance"})
+            self.assertEqual({r["scenario"] for r in results}, {"long_context", "loop"})
+            for r in results:
+                self.assertEqual(
+                    r["max_tokens"], config["agent_performance"]["output_tokens"][r["mode"]]
+                )
+            bodies = [body for body, _ in server.requests]
+            self.assertTrue(
+                any(body["max_tokens"] == config["output_tokens"]["off"] for body in bodies)
+            )
+            for body in bodies:
+                if "tools" in body:
+                    self.assertEqual(body["max_tokens"], 16384 if enabled(body) else 4096)
+            for suffix in ("md", "html"):
+                rendered = (directory / ("report." + suffix)).read_text()
+                self.assertIn("关闭思考 4096 Token", rendered)
+                self.assertIn("开启思考 16384 Token", rendered)
+            self.assertEqual(bench.generate_report(directory), summary)
 
     def test_tool_delta_is_not_ready_until_finished(self):
         obs = bench.ToolObservation()
@@ -206,6 +280,18 @@ class AgentConclusionTests(unittest.TestCase):
         findings = bench.agent_observations({"cells": rows}, agent_config())
         self.assertFalse(any(x["kind"] == "degradation" for x in findings))
         self.assertTrue(any(x["kind"] == "truncated" for x in findings))
+
+    def test_highlights_deduplicate_metrics_but_retain_recovery_and_evidence(self):
+        rows = self.rows()
+        agent = {"cells": rows}
+        agent["observations"] = bench.agent_observations(agent, agent_config())
+        before = copy.deepcopy(agent)
+        findings = bench.agent_highlights(agent)
+        self.assertEqual(len(findings), 1)
+        self.assertIn("128 → 256", findings[0])
+        self.assertIn("局部劣化", findings[0])
+        self.assertIn("样本 3/3", findings[0])
+        self.assertEqual(agent, before)
 
 
 class AgentRunTests(unittest.TestCase):
@@ -534,10 +620,13 @@ class AgentRunTests(unittest.TestCase):
             checks = summary["agent_performance"]["cells"][0]["target_checks"]
             self.assertEqual([x["result"] for x in checks], ["本次观测达标", "本次观测未达标"])
             changed = copy.deepcopy(summary["agent_performance"])
-            changed["observations"][0]["text"] = '<img src=x onerror="alert(1)">'
+            changed["cells"][0]["target_checks"][0]["metric"] = '<img src=x onerror="alert(1)">'
             html = "".join(bench.render_agent_html(changed))
             self.assertNotIn("<img", html)
             self.assertIn("&lt;img", html)
+            for title in ("多轮 Loop", "关闭思考 · 并发 1 · Loop 逐轮"):
+                start = html.index(">" + title + "</h3>")
+                self.assertLess(html.index("<figure", start), html.index("<table", start))
 
 
 class AgentMediaAndBoundaryTests(unittest.TestCase):
@@ -572,6 +661,7 @@ class AgentMediaAndBoundaryTests(unittest.TestCase):
                 audio.writeframes(b"\x00\x00" * 1600)
             config = agent_config(server.url, ["loop"])
             config["agent_performance"]["scenarios"] = ["image_input", "audio_input"]
+            config["agent_performance"]["output_tokens"] = {"off": 4096, "on": 16384}
             config["agent_performance"]["media_samples"] = [
                 {"kind": "image", "path": str(png), "count": 2},
                 {"kind": "audio", "path": str(wav)},
@@ -586,6 +676,7 @@ class AgentMediaAndBoundaryTests(unittest.TestCase):
                 if isinstance(body["messages"][0]["content"], list)
             ]
             self.assertEqual(len(media_requests), 8)
+            self.assertTrue(all(body["max_tokens"] == 4096 for body in media_requests))
             meta = summary["config"]["agent_performance"]["media_samples"]
             self.assertEqual(meta[0]["count"], 2)
             self.assertEqual(meta[1]["duration_ms"], 100)

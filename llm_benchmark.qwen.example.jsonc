@@ -64,6 +64,8 @@
   // Agent 场景专项：默认关闭；true 启用长上下文与多轮 Loop，参数见使用说明。
   "agent_performance": {
     "enabled": false,
+    // Agent 每次调用的独立输出 Token 上限（含思考），不影响常规测试。
+    "output_tokens": {"off": 4096, "on": 16384},
     "scenarios": ["long_context", "loop"],
     "concurrency": [1, 5, 10],
     "repetitions": 3,
