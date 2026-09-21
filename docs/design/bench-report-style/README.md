@@ -100,7 +100,7 @@ A/B/C 编号贯穿卡片、图表节点、延迟/输出/证据明细重点行。
    .venv/bin/ruff check --target-version py39 llm_benchmark.py tests/test_standalone_llm_benchmark.py
    ```
 
-   完整测试使用本机 mock HTTP 服务，不请求真实模型。上述测试文件已被当前 CI 的 standalone-benchmark 作业收集，不需要新增工作流。
+   完整测试使用本机 mock HTTP 服务，不请求真实模型。公开仓库 .github/workflows/standalone.yml 在 Windows、Linux、macOS 的 Python 3.9/3.13 上执行回归。
 5. CSS 基线检查覆盖普通/Agent 打印分支；SVG 快照覆盖色阶、曲线、零值、缺失断线、空心点、重点编号和链接。现有报告测试另行覆盖章节顺序、双模式选择、异常关联、转义、自评原文及数据不变。
 6. 样式变更后，还应查看桌面/窄屏及 A4 打印：长表、长模型名/错误、自评长段、单模式、无数据与中断。快照测试不能代替实际浏览器视觉检查；受环境限制未完成的验收必须明确记录。
 

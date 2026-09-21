@@ -1,5 +1,15 @@
 # 更新记录 / Changelog
 
+## 1.10.3 — 2026-09-21（正式版 / Stable）
+
+- Windows 中文终端与重定向输出改用 UTF-8，修复隔离运行时的编码错误。
+- 修复无自评时独占一页的问题；附录精简为必要口径，详细定义移至独立文档；支持信息加大字号并突出显示。
+- 报告样式基线升为 1.1，公开 HTML/PDF/Markdown/PNG 预览更新为当前生成器输出。
+- 新增 Windows/Linux/macOS × Python 3.9/3.13 CI；六组全部通过。每组发现 132 项测试，Windows 的 2 项 POSIX 专属测试跳过，强制终止与恢复另行覆盖。
+- 五类 Chrome A4 样本及隔离运行包验收通过。保留 1.10.2 预发布资产。
+
+详见 [验收记录](docs/RELEASE_ACCEPTANCE.md)、[样式规范](docs/design/bench-report-style/README.md) 和 [完整测量定义](docs/BENCH_MEASUREMENT.md)。本次未重新压测 GPU，历史真实结果及测量边界保持不变。
+
 ## 1.10.2 — 2026-09-21（预发布 / Prerelease）
 
 - Agent 独立输出配额：默认关闭思考 4096 / 开启思考 16384 Token，覆盖每次专项调用。只有预算及其他条件一致时复用常规数据。
